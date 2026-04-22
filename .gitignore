@@ -13,7 +13,7 @@ __pycache__/
 .mypy_cache/
 
 # Build and logs
-output/
+/output/
 *.log
 
 # OS/editor artifacts
