@@ -1,0 +1,72 @@
+name: Manual Recognition Run
+
+on:
+  workflow_dispatch:
+    inputs:
+      youtube_url:
+        description: "Optional YouTube URL. If empty, a synthetic local file is used."
+        required: false
+        type: string
+      use_acoustid:
+        description: "Enable AcoustID lookup"
+        required: true
+        default: false
+        type: boolean
+      audio_clips:
+        description: "Export WAV clips"
+        required: true
+        default: false
+        type: boolean
+
+jobs:
+  run-manual:
+    runs-on: ubuntu-latest
+    env:
+      ACOUSTID_API_KEY: ${{ secrets.ACOUSTID_API_KEY }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+
+      - name: Install system deps
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg chromaprint-tools
+
+      - name: Install Python deps
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run with URL or synthetic local file
+        shell: bash
+        run: |
+          mkdir -p output-manual tests/assets
+          if [ -n "${{ inputs.youtube_url }}" ]; then
+            python -m app.main \
+              --url "${{ inputs.youtube_url }}" \
+              --outdir output-manual \
+              --audio-clips "${{ inputs.audio_clips }}" \
+              --use-acoustid "${{ inputs.use_acoustid }}" \
+              --ref-library data/reference_library.json \
+              --device cpu
+          else
+            ffmpeg -y -f lavfi -i testsrc=size=1280x720:rate=30 -f lavfi -i sine=frequency=392:sample_rate=16000 -t 30 -c:v libx264 -c:a aac tests/assets/manual-smoke.mp4
+            python -m app.main \
+              --file tests/assets/manual-smoke.mp4 \
+              --outdir output-manual \
+              --audio-clips "${{ inputs.audio_clips }}" \
+              --use-acoustid "${{ inputs.use_acoustid }}" \
+              --ref-library data/reference_library.json \
+              --device cpu
+          fi
+
+      - name: Show manifest files
+        run: |
+          find output-manual/manifests -maxdepth 1 -type f -name '*.json' -print
+          find output-manual/manifests -maxdepth 1 -type f -name '*.csv' -print

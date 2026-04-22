@@ -1,0 +1,27 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+
+# Virtual env
+.venv/
+
+# Test/cache
+.pytest_cache/
+.mypy_cache/
+
+# Build and logs
+output/
+*.log
+
+# OS/editor artifacts
+.DS_Store
+Thumbs.db
+
+# Local secrets
+.env
+
+# Local generated data
+data/reference_library.json

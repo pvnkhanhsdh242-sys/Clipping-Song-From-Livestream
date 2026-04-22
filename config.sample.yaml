@@ -1,0 +1,11 @@
+pipeline:
+  outdir: output
+  audio_clips: false
+  min_segment: 8.0
+  max_segment: 240.0
+  merge_gap: 2.0
+  sample_rate: 16000
+  device: cpu
+  use_acoustid: false
+  ref_library: data/reference_library.json
+  fingerprint_threshold: 0.45

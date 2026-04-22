@@ -1,0 +1,4 @@
+# Optional heavy packages for full segmentation + refinement.
+# The app runs without these packages using built-in fallbacks.
+inaSpeechSegmenter>=0.8.0
+whisperx>=3.1.1
