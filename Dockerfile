@@ -6,7 +6,14 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 WORKDIR /app
 
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends ffmpeg chromaprint-tools libsndfile1 git \
+        && apt-get install -y --no-install-recommends ffmpeg libsndfile1 git \
+        && if apt-cache show libchromaprint-tools >/dev/null 2>&1; then \
+                 apt-get install -y --no-install-recommends libchromaprint-tools; \
+             elif apt-cache show chromaprint-tools >/dev/null 2>&1; then \
+                 apt-get install -y --no-install-recommends chromaprint-tools; \
+             else \
+                 echo "Chromaprint tools package unavailable; fpcalc will not be installed in this image."; \
+             fi \
     && rm -rf /var/lib/apt/lists/*
 
 COPY requirements.txt requirements-ml.txt ./

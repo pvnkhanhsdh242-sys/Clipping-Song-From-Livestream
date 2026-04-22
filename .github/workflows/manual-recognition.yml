@@ -36,7 +36,14 @@ jobs:
       - name: Install system deps
         run: |
           sudo apt-get update
-          sudo apt-get install -y ffmpeg chromaprint-tools
+          sudo apt-get install -y ffmpeg
+          if apt-cache show libchromaprint-tools >/dev/null 2>&1; then
+            sudo apt-get install -y libchromaprint-tools
+          elif apt-cache show chromaprint-tools >/dev/null 2>&1; then
+            sudo apt-get install -y chromaprint-tools
+          else
+            echo "Chromaprint tools package not available on this runner; continuing without fpcalc."
+          fi
 
       - name: Install Python deps
         run: |
