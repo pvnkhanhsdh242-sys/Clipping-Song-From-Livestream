@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Sequence
 
@@ -30,7 +30,7 @@ def _resolve_source(config: AppConfig, vods_dir: Path, logger) -> SourceVideo:
 
 def run_pipeline(config: AppConfig) -> int:
     output_dirs = prepare_output_dirs(config.outdir)
-    log_path = output_dirs["logs"] / f"run_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}.log"
+    log_path = output_dirs["logs"] / f"run_{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')}.log"
     logger = setup_logger(log_path)
 
     logger.info("Starting karaoke-clipper pipeline")
@@ -47,6 +47,7 @@ def run_pipeline(config: AppConfig) -> int:
         min_segment_sec=config.min_segment,
         max_segment_sec=config.max_segment,
         merge_gap_sec=config.merge_gap,
+        expected_song_count=config.expected_song_count,
         logger=logger,
     )
 
@@ -85,6 +86,7 @@ def run_pipeline(config: AppConfig) -> int:
             clip_stem=label,
             include_audio_clip=config.audio_clips,
             mode=config.clip_mode,
+            clip_resolution=config.clip_resolution,
             logger=logger,
         )
 

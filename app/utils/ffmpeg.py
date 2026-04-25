@@ -27,6 +27,8 @@ def run_command(command: Sequence[str], logger: logging.Logger, check: bool = Tr
         list(command),
         capture_output=True,
         text=True,
+        encoding="utf-8",
+        errors="replace",
         check=False,
     )
 

@@ -9,6 +9,13 @@ MAX_SEGMENT ?= 240
 USE_ACOUSTID ?= false
 REF_LIBRARY ?= data/reference_library.json
 DEVICE ?= cpu
+CLIP_RESOLUTION ?= source
+EXPECTED_SONG_COUNT ?=
+
+EXPECTED_SONG_ARG :=
+ifneq ($(strip $(EXPECTED_SONG_COUNT)),)
+EXPECTED_SONG_ARG := --expected-song-count "$(EXPECTED_SONG_COUNT)"
+endif
 
 ifeq ($(OS),Windows_NT)
 	VENV_PYTHON := $(VENV_DIR)/Scripts/python.exe
@@ -25,10 +32,10 @@ setup:
 	@echo "Base setup complete. Optional: install -r requirements-ml.txt for inaSpeechSegmenter and WhisperX."
 
 run-url:
-	$(VENV_PYTHON) -m app.main --url "$(URL)" --outdir "$(OUTDIR)" --audio-clips "$(AUDIO_CLIPS)" --min-segment "$(MIN_SEGMENT)" --max-segment "$(MAX_SEGMENT)" --use-acoustid "$(USE_ACOUSTID)" --ref-library "$(REF_LIBRARY)" --device "$(DEVICE)"
+	$(VENV_PYTHON) -m app.main --url "$(URL)" --outdir "$(OUTDIR)" --audio-clips "$(AUDIO_CLIPS)" --min-segment "$(MIN_SEGMENT)" --max-segment "$(MAX_SEGMENT)" --use-acoustid "$(USE_ACOUSTID)" --ref-library "$(REF_LIBRARY)" --device "$(DEVICE)" --clip-resolution "$(CLIP_RESOLUTION)" $(EXPECTED_SONG_ARG)
 
 run-file:
-	$(VENV_PYTHON) -m app.main --file "$(FILE)" --outdir "$(OUTDIR)" --audio-clips "$(AUDIO_CLIPS)" --min-segment "$(MIN_SEGMENT)" --max-segment "$(MAX_SEGMENT)" --use-acoustid "$(USE_ACOUSTID)" --ref-library "$(REF_LIBRARY)" --device "$(DEVICE)"
+	$(VENV_PYTHON) -m app.main --file "$(FILE)" --outdir "$(OUTDIR)" --audio-clips "$(AUDIO_CLIPS)" --min-segment "$(MIN_SEGMENT)" --max-segment "$(MAX_SEGMENT)" --use-acoustid "$(USE_ACOUSTID)" --ref-library "$(REF_LIBRARY)" --device "$(DEVICE)" --clip-resolution "$(CLIP_RESOLUTION)" $(EXPECTED_SONG_ARG)
 
 test:
 	$(VENV_PYTHON) -m pytest -q

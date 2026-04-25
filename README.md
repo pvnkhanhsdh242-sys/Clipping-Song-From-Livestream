@@ -52,6 +52,7 @@ Default flow:
 2. Optional full ML stack for better segmentation/refinement:
    - `.venv/Scripts/python -m pip install -r requirements-ml.txt` (Windows)
    - `.venv/bin/python -m pip install -r requirements-ml.txt` (Unix)
+  - Note: optional ML extras (for `inaSpeechSegmenter`/`whisperx`) typically require a Python version that supports TensorFlow wheels (recommended Python 3.9-3.12).
 
 ## Build Local Fingerprint Library
 Create an index from known songs folder:
@@ -64,11 +65,11 @@ Filename convention supported:
 ## Run Examples
 URL mode:
 
-`python -m app.main --url "https://www.youtube.com/watch?v=<video_id>" --outdir output --audio-clips true --use-acoustid false --ref-library data/reference_library.json --device cpu`
+`python -m app.main --url "https://www.youtube.com/watch?v=<video_id>" --outdir output --audio-clips true --use-acoustid false --ref-library data/reference_library.json --device cpu --clip-resolution 720p --expected-song-count 16`
 
 Local file mode:
 
-`python -m app.main --file "C:/videos/sample.mp4" --outdir output --audio-clips false --use-acoustid false --ref-library data/reference_library.json --device cpu`
+`python -m app.main --file "C:/videos/sample.mp4" --outdir output --audio-clips false --use-acoustid false --ref-library data/reference_library.json --device cpu --clip-resolution source`
 
 Makefile shortcuts:
 - `make run-url URL="https://www.youtube.com/watch?v=<video_id>"`
@@ -77,6 +78,10 @@ Makefile shortcuts:
 Batch mode:
 
 `python scripts/batch_run.py --input data/batch_sources.txt --outdir output/batch --ref-library data/reference_library.json`
+
+Batch mode with segment tuning:
+
+`python scripts/batch_run.py --input data/batch_sources.txt --outdir output/batch --min-segment 60 --max-segment 420 --merge-gap 3.5 --expected-song-count 16`
 
 ## CLI Reference
 - `--url <youtube_url>`
@@ -88,6 +93,15 @@ Batch mode:
 - `--use-acoustid true|false`
 - `--ref-library <path>`
 - `--device cpu|cuda`
+- `--clip-resolution source|1080p|720p|480p|360p`
+- `--expected-song-count <int>`
+
+Notes:
+- `--clip-resolution source` keeps original resolution.
+- Presets like `720p` and `1080p` re-encode clip video and preserve aspect ratio with padding when needed.
+- If `--clip-mode fast` is combined with a fixed resolution preset, clipping auto-switches to accurate mode for that clip.
+- `--expected-song-count` is a merge hint that reduces over-splitting by coalescing nearest neighboring segments toward your target count.
+- If finalized clip count is still higher than expected, increase `--merge-gap` (for example `--merge-gap 3.5`) to allow wider pauses to merge.
 
 ## Output Layout
 ```text

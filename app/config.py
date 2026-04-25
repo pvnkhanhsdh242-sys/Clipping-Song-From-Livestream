@@ -11,6 +11,9 @@ from typing import Optional, Sequence
 from dotenv import load_dotenv
 
 
+CLIP_RESOLUTION_CHOICES = ["source", "1080p", "720p", "480p", "360p"]
+
+
 def str_to_bool(value: str) -> bool:
     lowered = value.strip().lower()
     if lowered in {"1", "true", "t", "yes", "y", "on"}:
@@ -33,7 +36,9 @@ class AppConfig:
     device: str
     sample_rate: int
     merge_gap: float
+    expected_song_count: Optional[int]
     clip_mode: str
+    clip_resolution: str
     fingerprint_threshold: float
     acoustid_api_key: Optional[str]
 
@@ -57,7 +62,19 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--device", choices=["cpu", "cuda"], default="cpu", help="WhisperX device")
     parser.add_argument("--sample-rate", type=int, default=16000, help="Working WAV sample rate")
     parser.add_argument("--merge-gap", type=float, default=2.0, help="Merge candidate regions with <= this gap")
+    parser.add_argument(
+        "--expected-song-count",
+        type=int,
+        default=None,
+        help="Hint expected number of songs and merge over-split candidates toward this count",
+    )
     parser.add_argument("--clip-mode", choices=["fast", "accurate"], default="accurate", help="FFmpeg clip mode")
+    parser.add_argument(
+        "--clip-resolution",
+        choices=CLIP_RESOLUTION_CHOICES,
+        default="source",
+        help="Output clip resolution preset",
+    )
     parser.add_argument(
         "--fingerprint-threshold",
         type=float,
@@ -77,6 +94,8 @@ def load_config(argv: Optional[Sequence[str]] = None) -> AppConfig:
         parser.error("--min-segment must be > 0")
     if args.max_segment <= args.min_segment:
         parser.error("--max-segment must be greater than --min-segment")
+    if args.expected_song_count is not None and args.expected_song_count <= 0:
+        parser.error("--expected-song-count must be > 0")
 
     file_path = Path(args.file).expanduser().resolve() if args.file else None
     if file_path and not file_path.exists():
@@ -94,7 +113,9 @@ def load_config(argv: Optional[Sequence[str]] = None) -> AppConfig:
         device=args.device,
         sample_rate=int(args.sample_rate),
         merge_gap=float(args.merge_gap),
+        expected_song_count=args.expected_song_count,
         clip_mode=args.clip_mode,
+        clip_resolution=args.clip_resolution,
         fingerprint_threshold=float(args.fingerprint_threshold),
         acoustid_api_key=os.getenv("ACOUSTID_API_KEY"),
     )

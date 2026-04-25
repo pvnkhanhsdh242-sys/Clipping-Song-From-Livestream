@@ -50,7 +50,17 @@ class WhisperXRefiner:
             if not callable(transcribe_fn):
                 return start_sec, end_sec
 
-            result = transcribe_fn(str(probe_audio), batch_size=4)
+            try:
+                result = transcribe_fn(
+                    str(probe_audio),
+                    batch_size=4,
+                    vad_filter=False,
+                )
+            except TypeError as exc:
+                if "unexpected keyword argument 'vad_filter'" not in str(exc):
+                    raise
+                # Backward compatibility: some WhisperX builds do not expose vad_filter.
+                result = transcribe_fn(str(probe_audio), batch_size=4)
             segments = result.get("segments", []) if isinstance(result, dict) else []
             if not segments:
                 return start_sec, end_sec
