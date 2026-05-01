@@ -5,6 +5,7 @@ from __future__ import annotations
 import logging
 import shutil
 import subprocess
+from pathlib import Path
 from typing import Sequence
 
 
@@ -40,3 +41,34 @@ def run_command(command: Sequence[str], logger: logging.Logger, check: bool = Tr
             raise FFmpegError(f"Command failed: {' '.join(command)}")
 
     return completed
+
+
+def has_video_stream(media_path: Path, logger: logging.Logger) -> bool:
+    """Return True if the media contains at least one video stream."""
+    command = [
+        "ffprobe",
+        "-v",
+        "error",
+        "-select_streams",
+        "v:0",
+        "-show_entries",
+        "stream=codec_type",
+        "-of",
+        "csv=p=0",
+        str(media_path),
+    ]
+
+    completed = subprocess.run(
+        command,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+        check=False,
+    )
+
+    if completed.returncode != 0:
+        logger.warning("ffprobe failed for %s: %s", media_path, completed.stderr.strip())
+        return False
+
+    return "video" in completed.stdout.strip().lower()

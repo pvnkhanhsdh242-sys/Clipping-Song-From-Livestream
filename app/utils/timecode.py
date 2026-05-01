@@ -35,6 +35,8 @@ def timecode_to_seconds(value: str) -> float:
 
 def sanitize_filename_component(value: str) -> str:
     """Return a filesystem-safe label for clip names."""
-    cleaned = re.sub(r"[^a-zA-Z0-9._ -]+", "_", value).strip()
-    cleaned = re.sub(r"\s+", " ", cleaned)
+    cleaned = value.strip()
+    cleaned = re.sub(r"[<>:\"/\\|?*\x00-\x1F]+", "_", cleaned)
+    cleaned = re.sub(r"\s+", " ", cleaned).strip()
+    cleaned = cleaned.rstrip(" .")
     return cleaned or "unknown"

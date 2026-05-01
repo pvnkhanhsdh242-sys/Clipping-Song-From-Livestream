@@ -41,6 +41,11 @@ class AppConfig:
     clip_resolution: str
     fingerprint_threshold: float
     acoustid_api_key: Optional[str]
+    gdrive_upload: bool
+    gdrive_folder_id: Optional[str]
+    gdrive_client_secrets: Optional[Path]
+    gdrive_token_path: Path
+    gdrive_include_tmp: bool
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -53,7 +58,11 @@ def build_parser() -> argparse.ArgumentParser:
     source_group.add_argument("--url", help="YouTube VOD URL")
     source_group.add_argument("--file", help="Local MP4 file path")
 
-    parser.add_argument("--outdir", default="output", help="Output directory root")
+    parser.add_argument(
+        "--outdir",
+        default="output",
+        help="Parent output directory (run subfolder named after source title)",
+    )
     parser.add_argument("--audio-clips", type=str_to_bool, default=False, help="Also export WAV clips (true/false)")
     parser.add_argument("--min-segment", type=float, default=8.0, help="Minimum segment length in seconds")
     parser.add_argument("--max-segment", type=float, default=240.0, help="Maximum segment length in seconds")
@@ -81,6 +90,33 @@ def build_parser() -> argparse.ArgumentParser:
         default=0.45,
         help="Minimum local fingerprint confidence to accept",
     )
+    parser.add_argument(
+        "--gdrive-upload",
+        type=str_to_bool,
+        default=False,
+        help="Upload output folder to Google Drive (true/false)",
+    )
+    parser.add_argument(
+        "--gdrive-folder-id",
+        default=None,
+        help="Google Drive folder ID to upload into",
+    )
+    parser.add_argument(
+        "--gdrive-client-secrets",
+        default=None,
+        help="Path to Google OAuth client secrets JSON",
+    )
+    parser.add_argument(
+        "--gdrive-token",
+        default="secret/token.json",
+        help="Path to cache Google OAuth token",
+    )
+    parser.add_argument(
+        "--gdrive-include-tmp",
+        type=str_to_bool,
+        default=False,
+        help="Include tmp folder in Google Drive upload (true/false)",
+    )
 
     return parser
 
@@ -101,6 +137,14 @@ def load_config(argv: Optional[Sequence[str]] = None) -> AppConfig:
     if file_path and not file_path.exists():
         parser.error(f"Input file does not exist: {file_path}")
 
+    gdrive_folder_id = args.gdrive_folder_id or os.getenv("GDRIVE_FOLDER_ID")
+    gdrive_client_secrets = (
+        args.gdrive_client_secrets
+        or os.getenv("GDRIVE_CLIENT_SECRETS")
+        or "secret"
+    )
+    gdrive_token_value = os.getenv("GDRIVE_TOKEN") or args.gdrive_token
+
     return AppConfig(
         url=args.url,
         file=file_path,
@@ -118,4 +162,13 @@ def load_config(argv: Optional[Sequence[str]] = None) -> AppConfig:
         clip_resolution=args.clip_resolution,
         fingerprint_threshold=float(args.fingerprint_threshold),
         acoustid_api_key=os.getenv("ACOUSTID_API_KEY"),
+        gdrive_upload=bool(args.gdrive_upload),
+        gdrive_folder_id=str(gdrive_folder_id).strip() if gdrive_folder_id else None,
+        gdrive_client_secrets=(
+            Path(gdrive_client_secrets).expanduser().resolve()
+            if gdrive_client_secrets
+            else None
+        ),
+        gdrive_token_path=Path(gdrive_token_value).expanduser().resolve(),
+        gdrive_include_tmp=bool(args.gdrive_include_tmp),
     )

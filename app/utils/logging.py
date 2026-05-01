@@ -6,11 +6,15 @@ import logging
 from pathlib import Path
 
 
-def setup_logger(log_file: Path, level: int = logging.INFO) -> logging.Logger:
+def setup_logger(
+    log_file: Path,
+    level: int = logging.INFO,
+    name: str = "karaoke_clipper",
+) -> logging.Logger:
     """Configure application logger for console + file output."""
     log_file.parent.mkdir(parents=True, exist_ok=True)
 
-    logger = logging.getLogger("karaoke_clipper")
+    logger = logging.getLogger(name)
     logger.setLevel(level)
     logger.propagate = False
 

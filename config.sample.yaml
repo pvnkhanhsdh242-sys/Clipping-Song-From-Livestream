@@ -11,3 +11,8 @@ pipeline:
   use_acoustid: false
   ref_library: data/reference_library.json
   fingerprint_threshold: 0.45
+  gdrive_upload: false
+  gdrive_folder_id: null
+  gdrive_client_secrets: secret/client_secret.json
+  gdrive_token: secret/token.json
+  gdrive_include_tmp: false

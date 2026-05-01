@@ -95,19 +95,22 @@ The repo should deliver:
 
 ```text
 output/
-  vods/
-    title_[videoid].mp4
-    title_[videoid].info.json
-  audio/
-    title_[videoid].wav
-  clips/
-    song_001.mp4
-    song_001.wav
-    song_002.mp4
-  manifests/
-    title_[videoid]_manifest.json
-  logs/
-    run_2026-04-22.log
+  <title>/
+    vods/
+      title_[videoid].mp4
+      title_[videoid].info.json
+    audio/
+      title_[videoid].wav
+    clips/
+      song_001.mp4
+      song_001.wav
+      song_002.mp4
+    manifests/
+      title_[videoid]_manifest.json
+    previews/
+      segment_001_000752.jpg
+    logs/
+      run_2026-04-22.log
 ```
 
 ### Example manifest record
@@ -122,10 +125,18 @@ output/
   "start_tc": "00:12:32.200",
   "end_tc": "00:15:41.800",
   "confidence": 0.92,
-  "clip_path": "output/clips/song_001.mp4",
-  "audio_path": "output/clips/song_001.wav"
+  "clip_path": "output/<title>/clips/song_001.mp4",
+  "audio_path": "output/<title>/clips/song_001.wav"
 }
 ```
+
+### UI preview + Drive upload (optional)
+
+You can run a local Streamlit UI to enter parameters, preview segment timestamps, and then run the full clip export with optional Google Drive upload:
+
+`streamlit run app/ui/streamlit_app.py`
+
+Drive upload uses OAuth user login and stores a token at `secret/token.json` by default.
 
 ---
 

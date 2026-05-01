@@ -127,7 +127,7 @@ def main() -> int:
 
     failures = 0
     for index, item in enumerate(items, start=1):
-        run_outdir = outdir / f"item_{index:03d}"
+        run_outdir = outdir
         cmd = _build_command(
             item=item,
             outdir=run_outdir,

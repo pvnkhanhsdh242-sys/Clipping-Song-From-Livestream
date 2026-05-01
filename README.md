@@ -83,6 +83,20 @@ Batch mode with segment tuning:
 
 `python scripts/batch_run.py --input data/batch_sources.txt --outdir output/batch --min-segment 60 --max-segment 420 --merge-gap 3.5 --expected-song-count 16`
 
+## Streamlit UI
+Run a local UI to enter parameters, preview timestamps, and launch the pipeline:
+
+`streamlit run app/ui/streamlit_app.py`
+
+## Google Drive Upload
+Set folder ID in `.env` or pass via CLI:
+
+```env
+GDRIVE_FOLDER_ID=your_folder_id
+GDRIVE_CLIENT_SECRETS=secret/client_secret.json
+GDRIVE_TOKEN=secret/token.json
+```
+
 ## CLI Reference
 - `--url <youtube_url>`
 - `--file <local_mp4>`
@@ -93,8 +107,17 @@ Batch mode with segment tuning:
 - `--use-acoustid true|false`
 - `--ref-library <path>`
 - `--device cpu|cuda`
+- `--sample-rate <hz>`
 - `--clip-resolution source|1080p|720p|480p|360p`
+- `--clip-mode accurate|fast`
 - `--expected-song-count <int>`
+- `--merge-gap <seconds>`
+- `--fingerprint-threshold <0-1>`
+- `--gdrive-upload true|false`
+- `--gdrive-folder-id <id>`
+- `--gdrive-client-secrets <path>`
+- `--gdrive-token <path>`
+- `--gdrive-include-tmp true|false`
 
 Notes:
 - `--clip-resolution source` keeps original resolution.
@@ -102,16 +125,20 @@ Notes:
 - If `--clip-mode fast` is combined with a fixed resolution preset, clipping auto-switches to accurate mode for that clip.
 - `--expected-song-count` is a merge hint that reduces over-splitting by coalescing nearest neighboring segments toward your target count.
 - If finalized clip count is still higher than expected, increase `--merge-gap` (for example `--merge-gap 3.5`) to allow wider pauses to merge.
+- `--outdir` points to a parent folder; each run creates a sanitized `<title>` subfolder (falls back to video ID if title is missing).
+- Google Drive upload uses OAuth user login and stores a token at `secret/token.json` by default.
 
 ## Output Layout
 ```text
 output/
-  vods/
-  audio/
-  clips/
-  manifests/
-  logs/
-  tmp/
+  <title>/
+    vods/
+    audio/
+    clips/
+    manifests/
+    previews/
+    logs/
+    tmp/
 ```
 
 Manifest fields include:

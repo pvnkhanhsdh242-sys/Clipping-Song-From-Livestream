@@ -22,6 +22,8 @@ Thumbs.db
 
 # Local secrets
 .env
+secret/token.json
 
 # Local generated data
 data/reference_library.json
+secret/

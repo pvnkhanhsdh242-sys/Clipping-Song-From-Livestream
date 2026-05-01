@@ -11,6 +11,7 @@ OUTPUT_SUBDIRS = {
     "audio": "audio",
     "clips": "clips",
     "manifests": "manifests",
+    "previews": "previews",
     "logs": "logs",
     "tmp": "tmp",
 }
