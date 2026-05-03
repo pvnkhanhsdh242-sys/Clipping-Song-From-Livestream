@@ -173,6 +173,7 @@ def run_pipeline(config: AppConfig) -> int:
         merge_gap_sec=config.merge_gap,
         expected_song_count=config.expected_song_count,
         logger=logger,
+        exclude_start_seconds=config.exclude_start_seconds,
     )
 
     matcher = ChromaprintMatcher(config.ref_library, config.fingerprint_threshold, logger)
@@ -248,6 +249,7 @@ def preview_pipeline(config: AppConfig, snapshot_limit: int = 0) -> PreviewResul
         merge_gap_sec=config.merge_gap,
         expected_song_count=config.expected_song_count,
         logger=logger,
+        exclude_start_seconds=config.exclude_start_seconds,
     )
 
     matcher = ChromaprintMatcher(config.ref_library, config.fingerprint_threshold, logger)

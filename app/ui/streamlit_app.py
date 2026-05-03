@@ -30,6 +30,7 @@ def _build_config(
     device: str,
     sample_rate: int,
     merge_gap: float,
+    exclude_start_seconds: float,
     expected_song_count: int | None,
     clip_mode: str,
     clip_resolution: str,
@@ -55,6 +56,7 @@ def _build_config(
         device=device,
         sample_rate=int(sample_rate),
         merge_gap=float(merge_gap),
+        exclude_start_seconds=float(exclude_start_seconds),
         expected_song_count=expected_song_count,
         clip_mode=clip_mode,
         clip_resolution=clip_resolution,
@@ -106,6 +108,7 @@ with col1:
     min_segment = st.number_input("Min segment (sec)", min_value=1.0, value=8.0, step=1.0)
     max_segment = st.number_input("Max segment (sec)", min_value=1.0, value=240.0, step=1.0)
     merge_gap = st.number_input("Merge gap (sec)", min_value=0.0, value=2.0, step=0.1)
+    exclude_start_seconds = st.number_input("Exclude start (sec)", min_value=0.0, value=0.0, step=0.5)
 
 with col2:
     clip_mode = st.selectbox("Clip mode", ["accurate", "fast"], index=0)
@@ -182,6 +185,7 @@ if preview_clicked:
             device=device,
             sample_rate=sample_rate,
             merge_gap=merge_gap,
+            exclude_start_seconds=exclude_start_seconds,
             expected_song_count=expected_song_count,
             clip_mode=clip_mode,
             clip_resolution=clip_resolution,
@@ -223,6 +227,7 @@ if run_clicked:
             device=device,
             sample_rate=sample_rate,
             merge_gap=merge_gap,
+            exclude_start_seconds=exclude_start_seconds,
             expected_song_count=expected_song_count,
             clip_mode=clip_mode,
             clip_resolution=clip_resolution,

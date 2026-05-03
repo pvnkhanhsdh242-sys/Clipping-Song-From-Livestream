@@ -46,6 +46,7 @@ class AppConfig:
     gdrive_client_secrets: Optional[Path]
     gdrive_token_path: Path
     gdrive_include_tmp: bool
+    exclude_start_seconds: float
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -118,6 +119,13 @@ def build_parser() -> argparse.ArgumentParser:
         help="Include tmp folder in Google Drive upload (true/false)",
     )
 
+    parser.add_argument(
+        "--exclude-start-seconds",
+        type=float,
+        default=0.0,
+        help="Seconds at start of audio to ignore for segmentation",
+    )
+
     return parser
 
 
@@ -171,4 +179,5 @@ def load_config(argv: Optional[Sequence[str]] = None) -> AppConfig:
         ),
         gdrive_token_path=Path(gdrive_token_value).expanduser().resolve(),
         gdrive_include_tmp=bool(args.gdrive_include_tmp),
+        exclude_start_seconds=float(args.exclude_start_seconds),
     )

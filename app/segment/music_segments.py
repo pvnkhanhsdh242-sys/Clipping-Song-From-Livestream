@@ -249,6 +249,7 @@ def detect_music_segments(
     merge_gap_sec: float,
     expected_song_count: int | None,
     logger: logging.Logger,
+    exclude_start_seconds: float = 0.0,
 ) -> List[Segment]:
     """Detect candidate music regions from the working WAV file."""
     base_segments: List[Segment]
@@ -266,6 +267,24 @@ def detect_music_segments(
             )
         logger.warning("inaSpeechSegmenter unavailable or failed: %s.%s", exc, hint)
         base_segments = _segments_with_energy_fallback(audio_path, logger)
+
+    # Optionally ignore an initial duration of the audio for segmentation
+    if exclude_start_seconds and exclude_start_seconds > 0.0:
+        filtered: List[Segment] = []
+        for seg in base_segments:
+            if seg.end <= exclude_start_seconds:
+                # Entire segment falls within excluded head - drop it
+                continue
+            # Clamp start to the exclusion boundary but keep end in original timeline
+            new_start = max(seg.start, exclude_start_seconds)
+            filtered.append(Segment(new_start, seg.end, seg.label, seg.score))
+        logger.info(
+            "Excluding first %.2fs from segmentation: reduced raw regions %s -> %s",
+            exclude_start_seconds,
+            len(base_segments),
+            len(filtered),
+        )
+        base_segments = filtered
 
     merged = merge_adjacent_segments(
         base_segments,

@@ -16,3 +16,4 @@ pipeline:
   gdrive_client_secrets: secret/client_secret.json
   gdrive_token: secret/token.json
   gdrive_include_tmp: false
+  exclude_start_seconds: 0.0

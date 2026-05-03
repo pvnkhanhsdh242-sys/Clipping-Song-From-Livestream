@@ -88,6 +88,8 @@ Run a local UI to enter parameters, preview timestamps, and launch the pipeline:
 
 `streamlit run app/ui/streamlit_app.py`
 
+On Windows, use `run_streamlit_chrome.bat` if you want the app to open in Chrome instead of the system default browser.
+
 ## Google Drive Upload
 Set folder ID in `.env` or pass via CLI:
 
