@@ -86,9 +86,10 @@ def get_drive_service(
 
 def ensure_drive_folder(service, name: str, parent_id: Optional[str], logger: logging.Logger) -> str:
     safe_name = name.strip() or "output"
+    escaped_name = safe_name.replace("'", "\\'")
     query = (
         "mimeType='application/vnd.google-apps.folder' "
-        f"and name='{safe_name.replace("'", "\\'")}' "
+        f"and name='{escaped_name}' "
         "and trashed=false"
     )
     if parent_id:
