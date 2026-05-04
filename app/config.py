@@ -46,6 +46,7 @@ class AppConfig:
     gdrive_client_secrets: Optional[Path]
     gdrive_token_path: Path
     gdrive_include_tmp: bool
+    gdrive_upload_mode: str
     exclude_start_seconds: float
 
 
@@ -120,6 +121,13 @@ def build_parser() -> argparse.ArgumentParser:
     )
 
     parser.add_argument(
+        "--gdrive-upload-mode",
+        choices=["clips", "all"],
+        default="clips",
+        help="Upload mode when gdrive upload is enabled: 'clips' or 'all'",
+    )
+
+    parser.add_argument(
         "--exclude-start-seconds",
         type=float,
         default=0.0,
@@ -146,6 +154,26 @@ def load_config(argv: Optional[Sequence[str]] = None) -> AppConfig:
         parser.error(f"Input file does not exist: {file_path}")
 
     gdrive_folder_id = args.gdrive_folder_id or os.getenv("GDRIVE_FOLDER_ID")
+    # Accept full Drive folder URLs and extract the folder ID when provided
+    def _extract_drive_folder_id(value: Optional[str]) -> Optional[str]:
+        if not value:
+            return None
+        val = str(value).strip()
+        # common URL patterns: .../folders/<id> or ?id=<id>
+        if "drive.google.com" in val:
+            # try folders/ pattern
+            if "/folders/" in val:
+                parts = val.split("/folders/")
+                if len(parts) > 1:
+                    return parts[1].split("?")[0].strip("/ ")
+            # try id= query
+            if "id=" in val:
+                for part in val.split("&"):
+                    if part.startswith("id="):
+                        return part.split("=", 1)[1]
+        return val or None
+
+    gdrive_folder_id = _extract_drive_folder_id(gdrive_folder_id)
     gdrive_client_secrets = (
         args.gdrive_client_secrets
         or os.getenv("GDRIVE_CLIENT_SECRETS")
@@ -179,5 +207,6 @@ def load_config(argv: Optional[Sequence[str]] = None) -> AppConfig:
         ),
         gdrive_token_path=Path(gdrive_token_value).expanduser().resolve(),
         gdrive_include_tmp=bool(args.gdrive_include_tmp),
+        gdrive_upload_mode=str(args.gdrive_upload_mode),
         exclude_start_seconds=float(args.exclude_start_seconds),
     )

@@ -1,0 +1,57 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1050" height="610" viewBox="0 0 1050 610" role="img" aria-label="Karaoke Clipper generated visual">
+  <defs><linearGradient id="lbg" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#020617"/><stop offset="100%" stop-color="#172554"/></linearGradient></defs>
+  <rect width="1050" height="610" rx="28" fill="url(#lbg)"/>
+  <text x="70" y="58" font-family="Inter, Segoe UI, Arial" font-size="32" font-weight="800" fill="#ffffff">Generated run folder</text>
+  <text x="70" y="88" font-family="Inter, Segoe UI, Arial" font-size="16" fill="#94a3b8">Each pipeline run creates a clean, reviewable output directory.</text>
+  <text x="80" y="516" font-family="JetBrains Mono, Consolas, monospace" font-size="16" fill="#e5e7eb">output/&lt;sanitized-title&gt;/</text>
+  
+    <g transform="translate(80,118)">
+      <rect width="360" height="42" rx="14" fill="#111827" stroke="#22d3ee" stroke-width="2"/>
+      <path d="M24 17 h28 l8 8 h78 v14 h-114 z" fill="#22d3ee" opacity="0.92"/>
+      <text x="168" y="27" font-family="Inter, Segoe UI, Arial" font-size="17" font-weight="800" fill="#e5e7eb">vods/</text>
+      <text x="480" y="27" font-family="Inter, Segoe UI, Arial" font-size="16" fill="#cbd5e1">source videos</text>
+    </g>
+    
+    <g transform="translate(80,176)">
+      <rect width="360" height="42" rx="14" fill="#111827" stroke="#38bdf8" stroke-width="2"/>
+      <path d="M24 17 h28 l8 8 h78 v14 h-114 z" fill="#38bdf8" opacity="0.92"/>
+      <text x="168" y="27" font-family="Inter, Segoe UI, Arial" font-size="17" font-weight="800" fill="#e5e7eb">audio/</text>
+      <text x="480" y="27" font-family="Inter, Segoe UI, Arial" font-size="16" fill="#cbd5e1">working WAV files</text>
+    </g>
+    
+    <g transform="translate(80,234)">
+      <rect width="360" height="42" rx="14" fill="#111827" stroke="#818cf8" stroke-width="2"/>
+      <path d="M24 17 h28 l8 8 h78 v14 h-114 z" fill="#818cf8" opacity="0.92"/>
+      <text x="168" y="27" font-family="Inter, Segoe UI, Arial" font-size="17" font-weight="800" fill="#e5e7eb">clips/</text>
+      <text x="480" y="27" font-family="Inter, Segoe UI, Arial" font-size="16" fill="#cbd5e1">exported MP4/WAV clips</text>
+    </g>
+    
+    <g transform="translate(80,292)">
+      <rect width="360" height="42" rx="14" fill="#111827" stroke="#a78bfa" stroke-width="2"/>
+      <path d="M24 17 h28 l8 8 h78 v14 h-114 z" fill="#a78bfa" opacity="0.92"/>
+      <text x="168" y="27" font-family="Inter, Segoe UI, Arial" font-size="17" font-weight="800" fill="#e5e7eb">manifests/</text>
+      <text x="480" y="27" font-family="Inter, Segoe UI, Arial" font-size="16" fill="#cbd5e1">manifest.json and manifest.csv</text>
+    </g>
+    
+    <g transform="translate(80,350)">
+      <rect width="360" height="42" rx="14" fill="#111827" stroke="#f472b6" stroke-width="2"/>
+      <path d="M24 17 h28 l8 8 h78 v14 h-114 z" fill="#f472b6" opacity="0.92"/>
+      <text x="168" y="27" font-family="Inter, Segoe UI, Arial" font-size="17" font-weight="800" fill="#e5e7eb">previews/</text>
+      <text x="480" y="27" font-family="Inter, Segoe UI, Arial" font-size="16" fill="#cbd5e1">human-review preview assets</text>
+    </g>
+    
+    <g transform="translate(80,408)">
+      <rect width="360" height="42" rx="14" fill="#111827" stroke="#fb7185" stroke-width="2"/>
+      <path d="M24 17 h28 l8 8 h78 v14 h-114 z" fill="#fb7185" opacity="0.92"/>
+      <text x="168" y="27" font-family="Inter, Segoe UI, Arial" font-size="17" font-weight="800" fill="#e5e7eb">logs/</text>
+      <text x="480" y="27" font-family="Inter, Segoe UI, Arial" font-size="16" fill="#cbd5e1">run logs</text>
+    </g>
+    
+    <g transform="translate(80,466)">
+      <rect width="360" height="42" rx="14" fill="#111827" stroke="#f59e0b" stroke-width="2"/>
+      <path d="M24 17 h28 l8 8 h78 v14 h-114 z" fill="#f59e0b" opacity="0.92"/>
+      <text x="168" y="27" font-family="Inter, Segoe UI, Arial" font-size="17" font-weight="800" fill="#e5e7eb">tmp/</text>
+      <text x="480" y="27" font-family="Inter, Segoe UI, Arial" font-size="16" fill="#cbd5e1">temporary processing files</text>
+    </g>
+    
+</svg>

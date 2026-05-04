@@ -1,0 +1,59 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="420" viewBox="0 0 1280 420" role="img" aria-label="Karaoke Clipper generated visual">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#101827"/>
+      <stop offset="50%" stop-color="#34135a"/>
+      <stop offset="100%" stop-color="#0f766e"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="72%" cy="35%" r="55%">
+      <stop offset="0%" stop-color="#f472b6" stop-opacity="0.46"/>
+      <stop offset="100%" stop-color="#f472b6" stop-opacity="0"/>
+    </radialGradient>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="16" stdDeviation="18" flood-color="#000000" flood-opacity="0.35"/>
+    </filter>
+    <linearGradient id="wave" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#22d3ee"/>
+      <stop offset="50%" stop-color="#a78bfa"/>
+      <stop offset="100%" stop-color="#fb7185"/>
+    </linearGradient>
+  </defs>
+  <rect width="1280" height="420" rx="36" fill="url(#bg)"/>
+  <rect width="1280" height="420" rx="36" fill="url(#glow)"/>
+
+  <g opacity="0.16">
+    <circle cx="1030" cy="80" r="110" fill="#fff"/>
+    <circle cx="1100" cy="290" r="165" fill="#fff"/>
+    <circle cx="90" cy="350" r="130" fill="#fff"/>
+  </g>
+
+  <g transform="translate(66,64)">
+    <rect x="0" y="0" width="530" height="292" rx="28" fill="#0b1020" opacity="0.72" filter="url(#shadow)"/>
+    <rect x="28" y="32" width="110" height="70" rx="14" fill="#1f2937"/>
+    <polygon points="72,49 72,86 104,67" fill="#22d3ee"/>
+    <text x="158" y="56" font-family="Inter, Segoe UI, Arial, sans-serif" font-size="24" font-weight="700" fill="#e5e7eb">VOD / MP4</text>
+    <text x="158" y="86" font-family="Inter, Segoe UI, Arial, sans-serif" font-size="16" fill="#9ca3af">ingest · detect · identify · clip</text>
+
+    <path d="M40 180 C70 132, 92 226, 118 180 S166 132, 196 180 S248 230, 282 180 S344 130, 378 180 S444 232, 492 178" fill="none" stroke="url(#wave)" stroke-width="10" stroke-linecap="round"/>
+    <g fill="#e5e7eb" opacity="0.9" font-family="Inter, Segoe UI, Arial, sans-serif" font-size="15">
+      <text x="40" y="248">manifest.json</text>
+      <text x="192" y="248">clips/</text>
+      <text x="292" y="248">logs/</text>
+      <text x="392" y="248">Drive upload</text>
+    </g>
+  </g>
+
+  <g transform="translate(665,92)">
+    <text x="0" y="0" font-family="Inter, Segoe UI, Arial, sans-serif" font-size="58" font-weight="800" fill="#ffffff">karaoke-clipper</text>
+    <text x="2" y="52" font-family="Inter, Segoe UI, Arial, sans-serif" font-size="24" fill="#d1d5db">Auto-detect sung-song moments from VODs</text>
+    <text x="2" y="88" font-family="Inter, Segoe UI, Arial, sans-serif" font-size="24" fill="#d1d5db">and export clean, reviewable clips.</text>
+    <g transform="translate(0,126)" font-family="Inter, Segoe UI, Arial, sans-serif" font-size="16" font-weight="700">
+      <rect x="0" y="0" width="166" height="42" rx="21" fill="#22d3ee" opacity="0.18" stroke="#67e8f9"/>
+      <text x="22" y="27" fill="#cffafe">API-free first</text>
+      <rect x="184" y="0" width="178" height="42" rx="21" fill="#a78bfa" opacity="0.18" stroke="#c4b5fd"/>
+      <text x="206" y="27" fill="#ede9fe">FFmpeg clips</text>
+      <rect x="380" y="0" width="220" height="42" rx="21" fill="#fb7185" opacity="0.18" stroke="#fda4af"/>
+      <text x="404" y="27" fill="#ffe4e6">review manifests</text>
+    </g>
+  </g>
+</svg>

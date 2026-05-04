@@ -1,0 +1,66 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="360" viewBox="0 0 1200 360" role="img" aria-label="Karaoke Clipper generated visual">
+  <defs>
+    <linearGradient id="pbg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#020617"/>
+      <stop offset="100%" stop-color="#111827"/>
+    </linearGradient>
+  </defs>
+  <rect width="1200" height="360" rx="28" fill="url(#pbg)"/>
+  <text x="60" y="62" font-family="Inter, Segoe UI, Arial" font-size="32" font-weight="800" fill="#ffffff">Default processing pipeline</text>
+  <text x="60" y="94" font-family="Inter, Segoe UI, Arial" font-size="16" fill="#94a3b8">From one source video to timestamped clips, logs, and reviewable manifests.</text>
+  
+    <g transform="translate(60,118)">
+      <rect width="150" height="128" rx="24" fill="#111827" stroke="#22d3ee" stroke-opacity="0.75" stroke-width="2"/>
+      <circle cx="34" cy="34" r="18" fill="#22d3ee" opacity="0.96"/>
+      <text x="34" y="40" text-anchor="middle" font-family="Inter, Segoe UI, Arial" font-size="17" font-weight="800" fill="#0b1020">1</text>
+      <text x="24" y="72" font-family="Inter, Segoe UI, Arial" font-size="20" font-weight="800" fill="#f9fafb">Ingest</text>
+      <text x="24" y="98" font-family="Inter, Segoe UI, Arial" font-size="14" fill="#cbd5e1">YouTube URL</text>
+      <text x="24" y="118" font-family="Inter, Segoe UI, Arial" font-size="14" fill="#cbd5e1">or local MP4</text>
+    </g>
+    <path d="M215 182 L245 182" stroke="#475569" stroke-width="4" stroke-linecap="round"/><path d="M237 174 L245 182 L237 190" fill="none" stroke="#475569" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+    <g transform="translate(250,118)">
+      <rect width="150" height="128" rx="24" fill="#111827" stroke="#38bdf8" stroke-opacity="0.75" stroke-width="2"/>
+      <circle cx="34" cy="34" r="18" fill="#38bdf8" opacity="0.96"/>
+      <text x="34" y="40" text-anchor="middle" font-family="Inter, Segoe UI, Arial" font-size="17" font-weight="800" fill="#0b1020">2</text>
+      <text x="24" y="72" font-family="Inter, Segoe UI, Arial" font-size="20" font-weight="800" fill="#f9fafb">Audio</text>
+      <text x="24" y="98" font-family="Inter, Segoe UI, Arial" font-size="14" fill="#cbd5e1">Mono WAV</text>
+      <text x="24" y="118" font-family="Inter, Segoe UI, Arial" font-size="14" fill="#cbd5e1">via FFmpeg</text>
+    </g>
+    <path d="M405 182 L435 182" stroke="#475569" stroke-width="4" stroke-linecap="round"/><path d="M427 174 L435 182 L427 190" fill="none" stroke="#475569" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+    <g transform="translate(440,118)">
+      <rect width="150" height="128" rx="24" fill="#111827" stroke="#818cf8" stroke-opacity="0.75" stroke-width="2"/>
+      <circle cx="34" cy="34" r="18" fill="#818cf8" opacity="0.96"/>
+      <text x="34" y="40" text-anchor="middle" font-family="Inter, Segoe UI, Arial" font-size="17" font-weight="800" fill="#0b1020">3</text>
+      <text x="24" y="72" font-family="Inter, Segoe UI, Arial" font-size="20" font-weight="800" fill="#f9fafb">Segment</text>
+      <text x="24" y="98" font-family="Inter, Segoe UI, Arial" font-size="14" fill="#cbd5e1">Music-like</text>
+      <text x="24" y="118" font-family="Inter, Segoe UI, Arial" font-size="14" fill="#cbd5e1">regions</text>
+    </g>
+    <path d="M595 182 L625 182" stroke="#475569" stroke-width="4" stroke-linecap="round"/><path d="M617 174 L625 182 L617 190" fill="none" stroke="#475569" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+    <g transform="translate(630,118)">
+      <rect width="150" height="128" rx="24" fill="#111827" stroke="#a78bfa" stroke-opacity="0.75" stroke-width="2"/>
+      <circle cx="34" cy="34" r="18" fill="#a78bfa" opacity="0.96"/>
+      <text x="34" y="40" text-anchor="middle" font-family="Inter, Segoe UI, Arial" font-size="17" font-weight="800" fill="#0b1020">4</text>
+      <text x="24" y="72" font-family="Inter, Segoe UI, Arial" font-size="20" font-weight="800" fill="#f9fafb">Identify</text>
+      <text x="24" y="98" font-family="Inter, Segoe UI, Arial" font-size="14" fill="#cbd5e1">Chromaprint</text>
+      <text x="24" y="118" font-family="Inter, Segoe UI, Arial" font-size="14" fill="#cbd5e1">+ optional AcoustID</text>
+    </g>
+    <path d="M785 182 L815 182" stroke="#475569" stroke-width="4" stroke-linecap="round"/><path d="M807 174 L815 182 L807 190" fill="none" stroke="#475569" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+    <g transform="translate(820,118)">
+      <rect width="150" height="128" rx="24" fill="#111827" stroke="#f472b6" stroke-opacity="0.75" stroke-width="2"/>
+      <circle cx="34" cy="34" r="18" fill="#f472b6" opacity="0.96"/>
+      <text x="34" y="40" text-anchor="middle" font-family="Inter, Segoe UI, Arial" font-size="17" font-weight="800" fill="#0b1020">5</text>
+      <text x="24" y="72" font-family="Inter, Segoe UI, Arial" font-size="20" font-weight="800" fill="#f9fafb">Refine</text>
+      <text x="24" y="98" font-family="Inter, Segoe UI, Arial" font-size="14" fill="#cbd5e1">WhisperX</text>
+      <text x="24" y="118" font-family="Inter, Segoe UI, Arial" font-size="14" fill="#cbd5e1">when available</text>
+    </g>
+    <path d="M975 182 L1005 182" stroke="#475569" stroke-width="4" stroke-linecap="round"/><path d="M997 174 L1005 182 L997 190" fill="none" stroke="#475569" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+    <g transform="translate(1010,118)">
+      <rect width="150" height="128" rx="24" fill="#111827" stroke="#fb7185" stroke-opacity="0.75" stroke-width="2"/>
+      <circle cx="34" cy="34" r="18" fill="#fb7185" opacity="0.96"/>
+      <text x="34" y="40" text-anchor="middle" font-family="Inter, Segoe UI, Arial" font-size="17" font-weight="800" fill="#0b1020">6</text>
+      <text x="24" y="72" font-family="Inter, Segoe UI, Arial" font-size="20" font-weight="800" fill="#f9fafb">Export</text>
+      <text x="24" y="98" font-family="Inter, Segoe UI, Arial" font-size="14" fill="#cbd5e1">MP4/WAV clips</text>
+      <text x="24" y="118" font-family="Inter, Segoe UI, Arial" font-size="14" fill="#cbd5e1">+ manifests</text>
+    </g>
+    
+</svg>

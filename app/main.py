@@ -19,7 +19,6 @@ from app.ingest.youtube import (
     probe_youtube_metadata,
     register_local_video,
 )
-from app.integrations.gdrive import upload_output_dir
 from app.output.manifest import ManifestRecord, write_manifests
 from app.output.preview import PreviewRecord, generate_snapshots
 from app.preprocess.extract_audio import extract_working_audio
@@ -139,14 +138,28 @@ def _maybe_upload_outputs(config: AppConfig, run_output_root: Path, logger) -> N
         return
 
     try:
-        upload_output_dir(
-            output_dir=run_output_root,
-            parent_folder_id=config.gdrive_folder_id,
-            client_secrets_path=config.gdrive_client_secrets,
-            token_path=config.gdrive_token_path,
-            include_tmp=config.gdrive_include_tmp,
-            logger=logger,
-        )
+        if getattr(config, "gdrive_upload_mode", "clips") == "all":
+            from app.integrations.gdrive import upload_output_dir
+
+            upload_output_dir(
+                output_dir=run_output_root,
+                parent_folder_id=config.gdrive_folder_id,
+                client_secrets_path=config.gdrive_client_secrets,
+                token_path=config.gdrive_token_path,
+                include_tmp=config.gdrive_include_tmp,
+                logger=logger,
+            )
+        else:
+            # Upload only the clips folder to Drive; other artifacts remain local.
+            from app.integrations.gdrive import upload_clips_dir
+
+            upload_clips_dir(
+                output_dir=run_output_root,
+                parent_folder_id=config.gdrive_folder_id,
+                client_secrets_path=config.gdrive_client_secrets,
+                token_path=config.gdrive_token_path,
+                logger=logger,
+            )
     except Exception as exc:  # pragma: no cover - network/auth dependent path
         logger.warning("Google Drive upload failed: %s", exc)
 

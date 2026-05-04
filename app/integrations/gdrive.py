@@ -160,3 +160,34 @@ def upload_output_dir(
     run_folder_id = ensure_drive_folder(service, output_dir.name, parent_folder_id, logger)
     upload_directory(service, output_dir, run_folder_id, include_tmp, logger)
     return run_folder_id
+
+
+def upload_clips_dir(
+    output_dir: Path,
+    parent_folder_id: str,
+    client_secrets_path: Optional[Path],
+    token_path: Path,
+    logger: logging.Logger,
+) -> str:
+    """Upload only the `clips/` folder under a run output to the given Drive folder.
+
+    Creates a run folder under the provided parent, then creates a `clips` child
+    and uploads files from local `output_dir/clips` into it.
+    Returns the Drive id of the created clips folder.
+    """
+    service = get_drive_service(client_secrets_path, token_path, logger)
+    run_folder_id = ensure_drive_folder(service, output_dir.name, parent_folder_id, logger)
+
+    local_clips = (output_dir / "clips").resolve()
+    if not local_clips.exists():
+        logger.warning("No clips folder to upload at %s", local_clips)
+        return run_folder_id
+
+    clips_folder_id = ensure_drive_folder(service, "clips", run_folder_id, logger)
+
+    # upload files directly under clips (no subfolders by design)
+    for item in sorted(local_clips.iterdir()):
+        if item.is_file() and not item.name.startswith("."):
+            upload_file(service, item, clips_folder_id, logger)
+
+    return clips_folder_id
