@@ -5,7 +5,6 @@ from __future__ import annotations
 import json
 import logging
 import tempfile
-from difflib import SequenceMatcher
 from pathlib import Path
 from typing import Any, Optional
 
@@ -73,7 +72,7 @@ def _normalize_score(raw_score: Any) -> float:
     return 1.0 / (1.0 + score)
 
 
-def compare_fingerprints(query_fp: str, candidate_fp: str) -> float:
+def compare_fingerprints(query_fp: str, candidate_fp: str) -> Optional[float]:
     """Compare two fingerprints and return confidence in [0, 1]."""
     try:
         import acoustid  # type: ignore
@@ -86,8 +85,7 @@ def compare_fingerprints(query_fp: str, candidate_fp: str) -> float:
             return _normalize_score(raw)
     except Exception:
         pass
-
-    return SequenceMatcher(None, query_fp, candidate_fp).ratio()
+    return None
 
 
 class ChromaprintMatcher:
@@ -150,14 +148,28 @@ class ChromaprintMatcher:
 
         best_score = 0.0
         best_record: Optional[dict[str, Any]] = None
+        compare_available = True
 
         for record in self.records:
             score = compare_fingerprints(query_fingerprint, record["fingerprint"])
+            if score is None:
+                compare_available = False
+                break
             if score > best_score:
                 best_score = score
                 best_record = record
 
         segment_audio.unlink(missing_ok=True)
+
+        if not compare_available:
+            return MatchResult(
+                song="Unknown Song",
+                artist="Unknown Artist",
+                confidence=0.0,
+                backend="chromaprint_unavailable",
+                needs_review=True,
+                review_reason="fingerprint_compare_unavailable",
+            )
 
         if not best_record or best_score < self.threshold:
             return None

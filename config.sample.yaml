@@ -1,9 +1,15 @@
 pipeline:
   outdir: output
   audio_clips: false
+  profile: karaoke
   min_segment: 8.0
   max_segment: 240.0
   merge_max_segment: 240.0
+  segment_tolerance: 0.0
+  pre_roll_sec: 0.5
+  post_roll_sec: 2.0
+  bridge_noise_gap_sec: 2.0
+  bridge_speech_gap_sec: 1.0
   merge_gap: 2.0
   expected_song_count: null
   sample_rate: 16000
@@ -12,7 +18,16 @@ pipeline:
   use_acoustid: false
   ref_library: data/reference_library.json
   fingerprint_threshold: 0.45
+  whisperx_boundary_mode: safe
+  whisperx_max_start_shrink_sec: 0.5
+  whisperx_max_end_shrink_sec: 0.5
+  allow_hard_split: false
+  energy_frame_ms: 100
+  energy_min_active_ms: 500
+  energy_min_silence_ms: 1200
+  review_score_threshold: 0.65
   gdrive_upload: false
+  gdrive_upload_mode: clips
   gdrive_folder_id: null
   gdrive_client_secrets: secret/client_secret.json
   gdrive_token: secret/token.json

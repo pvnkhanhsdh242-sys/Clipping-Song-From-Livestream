@@ -5,6 +5,15 @@ set "ROOT_DIR=%~dp0"
 set "APP_PATH=%ROOT_DIR%app\ui\streamlit_app.py"
 set "PYTHON_EXE=%ROOT_DIR%.venv\Scripts\python.exe"
 set "APP_URL=http://localhost:8501"
+set "ALREADY_RUNNING=0"
+
+powershell -NoProfile -Command "try { $response = Invoke-WebRequest -UseBasicParsing -Uri '%APP_URL%' -TimeoutSec 1; if ($response.StatusCode -ge 200) { exit 0 } } catch { } ; exit 1" >nul 2>&1
+if not errorlevel 1 set "ALREADY_RUNNING=1"
+
+if "%ALREADY_RUNNING%"=="1" (
+    echo Streamlit already running at %APP_URL%. Skipping launch.
+    goto :end
+)
 
 if not exist "%PYTHON_EXE%" (
     set "PYTHON_EXE=python"
@@ -29,4 +38,5 @@ if defined CHROME_EXE (
     start "Karaoke Clipper" "%APP_URL%"
 )
 
+:end
 endlocal

@@ -215,8 +215,15 @@ Notes:
 | `--file <local_mp4>` | Local MP4 input. |
 | `--outdir <path>` | Parent output directory. Each run creates a sanitized `<title>` subfolder. |
 | `--audio-clips true\|false` | Export WAV clips in addition to MP4 clips. |
+| `--profile <name>` | Preset tuning profile: `karaoke`, `concert`, `mixed_stream`, `strict`, `custom`. |
 | `--min-segment <seconds>` | Minimum candidate segment duration. |
 | `--max-segment <seconds>` | Maximum candidate segment duration. |
+| `--merge-max-segment <seconds>` | Cap for merging adjacent segments; overrides max segment for merging and splitting when set. |
+| `--segment-tolerance <seconds>` | Allow segments to be +/- this many seconds around min/max. |
+| `--pre-roll <seconds>` | Padding before each candidate segment. |
+| `--post-roll <seconds>` | Padding after each candidate segment. |
+| `--bridge-noise-gap <seconds>` | Bridge short `noise` gaps between music regions. |
+| `--bridge-speech-gap <seconds>` | Bridge short `speech`/`male`/`female` gaps between music regions. |
 | `--use-acoustid true\|false` | Enable optional AcoustID lookup. |
 | `--ref-library <path>` | Path to local Chromaprint reference library. |
 | `--device cpu\|cuda` | Compute device for optional ML steps. |
@@ -225,6 +232,14 @@ Notes:
 | `--clip-mode accurate\|fast` | Clip cutting mode. |
 | `--expected-song-count <int>` | Merge hint to reduce over-splitting. |
 | `--merge-gap <seconds>` | Pause threshold for merging neighboring segments. |
+| `--whisperx-boundary-mode off\|metadata\|safe` | WhisperX boundary handling. |
+| `--whisperx-max-start-shrink <seconds>` | Max start trim allowed in safe mode. |
+| `--whisperx-max-end-shrink <seconds>` | Max end trim allowed in safe mode. |
+| `--allow-hard-split true\|false` | Allow hard splitting long segments at max length. |
+| `--energy-frame-ms <ms>` | Energy fallback frame size in milliseconds. |
+| `--energy-min-active-ms <ms>` | Minimum active energy duration to start a segment. |
+| `--energy-min-silence-ms <ms>` | Minimum silence duration to stop a segment. |
+| `--review-score-threshold <0-1>` | Score below which clips are marked for review. |
 | `--fingerprint-threshold <0-1>` | Local matching confidence threshold. |
 | `--gdrive-upload true\|false` | Enable Google Drive upload. |
 | `--gdrive-folder-id <id>` | Target Drive folder ID or URL. |
@@ -239,6 +254,9 @@ Additional behavior:
 - If `--clip-mode fast` is combined with a fixed resolution preset, clipping automatically switches to accurate mode for that clip.
 - `--expected-song-count` coalesces nearest neighboring segments toward your target count.
 - If the finalized clip count is still higher than expected, increase `--merge-gap`, for example `--merge-gap 3.5`.
+- If `--merge-max-segment` differs from `--max-segment`, the merge max overrides max for merging and splitting.
+- Default profile `karaoke` applies stronger song-style defaults (use `--profile custom` to disable).
+- WhisperX `safe` mode limits how much boundaries can shrink from the padded clip.
 - Google Drive upload uses OAuth user login and stores a token at `secret/token.json` by default.
 
 ## Output layout
@@ -314,6 +332,93 @@ Covered areas:
 make docker-build
 make docker-run
 ```
+
+### Docker GPU build (CUDA)
+
+Requirements:
+
+- NVIDIA GPU with recent drivers
+- Docker Desktop / Docker Engine with GPU support enabled
+- NVIDIA Container Toolkit available to Docker (`docker run --gpus all ...` works)
+
+Build and run GPU image:
+
+```bash
+make docker-build-gpu
+make docker-run-gpu
+```
+
+Rebuild GPU image explicitly (only when dependencies/Dockerfile changed):
+
+```bash
+make docker-rebuild-gpu
+```
+
+Run CUDA visibility healthcheck only:
+
+```bash
+make docker-healthcheck-gpu
+```
+
+Start dedicated GPU Streamlit service (auto starts UI at http://localhost:8501):
+
+```bash
+make docker-streamlit-gpu
+```
+
+If `make` is unavailable on Windows, use:
+
+```bash
+docker_run_gpu.bat
+docker_healthcheck_gpu.bat
+docker_streamlit_gpu.bat
+docker_cleanup_gpu.bat
+docker_reset_streamlit_gpu.bat
+```
+
+Windows Streamlit shortcut behavior:
+
+- `docker_streamlit_gpu.bat` starts Streamlit without forcing a rebuild each time.
+- If image `karaoke-clipper:gpu` does not exist, it builds once then starts.
+- Use `docker_streamlit_gpu.bat --build` to force rebuild.
+- Use `docker_cleanup_gpu.bat` to remove current + legacy GPU image names and dangling layers.
+- Use `docker_reset_streamlit_gpu.bat` to cleanup, rebuild, and relaunch Streamlit in one command.
+- Use `docker_cleanup_gpu.bat --deep` to also remove Docker build cache and unused volumes when storage does not drop after image removal.
+- You can also run `docker_reset_streamlit_gpu.bat --deep` for deep cleanup + rebuild + restart.
+
+Cleanup and full rerun (single-shot):
+
+```bash
+docker_reset_streamlit_gpu.bat
+```
+
+Make-based cleanup and rerun:
+
+```bash
+make docker-clean-gpu
+make docker-reset-gpu
+```
+
+Direct Docker commands (cross-platform):
+
+```bash
+docker build -f Dockerfile.gpu -t karaoke-clipper:gpu .
+docker run --rm -it --gpus all -v "${PWD}/output:/app/output" -v "${PWD}/data:/app/data" -v "${PWD}/secret:/app/secret" karaoke-clipper:gpu
+```
+
+Or use Compose GPU service:
+
+```bash
+make docker-compose-gpu
+```
+
+Notes:
+
+- GPU image uses [Dockerfile.gpu](Dockerfile.gpu) and installs both base + ML requirements.
+- Compose and direct Docker now share one GPU image tag: `karaoke-clipper:gpu`.
+- `scripts/container_runtime.py` runs a CUDA healthcheck before app startup.
+- If CUDA is visible, runtime is forced to `cuda`; otherwise it falls back to `cpu` automatically.
+- In Streamlit container mode, device selection is locked to the forced runtime device.
 
 ## Working status, fallbacks, and limitations
 

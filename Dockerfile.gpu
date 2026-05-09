@@ -1,0 +1,36 @@
+ARG GPU_IMAGE_PLATFORM=linux/amd64
+FROM --platform=${GPU_IMAGE_PLATFORM} pytorch/pytorch:2.4.1-cuda12.1-cudnn9-runtime
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PIP_NO_CACHE_DIR=1 \
+    HF_HOME=/app/.cache/huggingface \
+    TORCH_HOME=/app/.cache/torch \
+    NVIDIA_VISIBLE_DEVICES=all \
+    NVIDIA_DRIVER_CAPABILITIES=compute,utility,video
+
+WORKDIR /app
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
+        ffmpeg \
+        libsndfile1 \
+        git \
+        ca-certificates \
+    && if apt-cache show libchromaprint-tools >/dev/null 2>&1; then \
+        apt-get install -y --no-install-recommends libchromaprint-tools; \
+    elif apt-cache show chromaprint-tools >/dev/null 2>&1; then \
+        apt-get install -y --no-install-recommends chromaprint-tools; \
+    else \
+        echo "Chromaprint tools package unavailable; fpcalc will not be installed in this image."; \
+    fi \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY requirements.txt requirements-ml.txt ./
+RUN pip install --upgrade pip \
+    && pip install -r requirements.txt \
+    && pip install -r requirements-ml.txt
+
+COPY . .
+
+CMD ["python", "scripts/container_runtime.py", "pipeline", "--", "--help"]

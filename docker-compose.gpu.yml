@@ -1,0 +1,41 @@
+x-gpu-common: &gpu-common
+  image: karaoke-clipper:gpu
+  build:
+    context: .
+    dockerfile: Dockerfile.gpu
+    args:
+      GPU_IMAGE_PLATFORM: ${DOCKER_GPU_PLATFORM:-linux/amd64}
+  platform: ${DOCKER_GPU_PLATFORM:-linux/amd64}
+  env_file:
+    - .env
+  volumes:
+    - ./output:/app/output
+    - ./data:/app/data
+    - ./secret:/app/secret
+    - ./.cache:/app/.cache
+  environment:
+    - NVIDIA_VISIBLE_DEVICES=all
+    - NVIDIA_DRIVER_CAPABILITIES=compute,utility,video
+    - PYTORCH_CUDA_ALLOC_CONF=max_split_size_mb:128
+  gpus:
+    - driver: nvidia
+      count: all
+      capabilities: [gpu]
+  healthcheck:
+    test: ["CMD", "python", "scripts/container_runtime.py", "healthcheck"]
+    interval: 30s
+    timeout: 15s
+    retries: 3
+    start_period: 20s
+
+services:
+  karaoke-clipper-streamlit-gpu:
+    <<: *gpu-common
+    ports:
+      - "8501:8501"
+    command: ["python", "scripts/container_runtime.py", "streamlit"]
+
+  karaoke-clipper-gpu:
+    <<: *gpu-common
+    profiles: ["cli"]
+    command: ["python", "scripts/container_runtime.py", "pipeline", "--", "--help"]

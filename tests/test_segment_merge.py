@@ -66,6 +66,7 @@ def test_split_overly_long_segment():
         max_gap_sec=1.0,
         min_segment_sec=10.0,
         max_segment_sec=30.0,
+        allow_hard_split=True,
     )
 
     assert len(merged) == 3

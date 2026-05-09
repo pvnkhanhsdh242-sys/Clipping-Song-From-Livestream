@@ -11,6 +11,7 @@ REF_LIBRARY ?= data/reference_library.json
 DEVICE ?= cpu
 CLIP_RESOLUTION ?= source
 EXPECTED_SONG_COUNT ?=
+RUN_ARGS ?= --help
 
 EXPECTED_SONG_ARG :=
 ifneq ($(strip $(EXPECTED_SONG_COUNT)),)
@@ -23,7 +24,7 @@ else
 	VENV_PYTHON := $(VENV_DIR)/bin/python
 endif
 
-.PHONY: setup run-url run-file test docker-build docker-run
+.PHONY: setup run-url run-file test docker-build docker-run docker-build-gpu docker-run-gpu docker-compose-gpu docker-streamlit-gpu docker-rebuild-gpu docker-healthcheck-gpu docker-clean-gpu docker-reset-gpu
 
 setup:
 	$(PYTHON) -m venv $(VENV_DIR)
@@ -45,3 +46,33 @@ docker-build:
 
 docker-run:
 	docker run --rm -it -v "${PWD}/output:/app/output" -v "${PWD}/data:/app/data" karaoke-clipper:latest
+
+docker-build-gpu:
+	docker build -f Dockerfile.gpu -t karaoke-clipper:gpu .
+
+docker-run-gpu:
+	docker run --rm -it --gpus all -v "${PWD}/output:/app/output" -v "${PWD}/data:/app/data" -v "${PWD}/secret:/app/secret" karaoke-clipper:gpu python scripts/container_runtime.py pipeline -- $(RUN_ARGS)
+
+docker-compose-gpu:
+	docker compose -f docker-compose.gpu.yml up karaoke-clipper-streamlit-gpu
+
+docker-streamlit-gpu:
+	docker compose -f docker-compose.gpu.yml up karaoke-clipper-streamlit-gpu
+
+docker-rebuild-gpu:
+	docker compose -f docker-compose.gpu.yml build karaoke-clipper-streamlit-gpu
+
+docker-healthcheck-gpu:
+	docker run --rm --gpus all karaoke-clipper:gpu python scripts/container_runtime.py healthcheck
+
+docker-clean-gpu:
+	docker compose -f docker-compose.gpu.yml down --remove-orphans
+	-docker image rm -f karaoke-clipper:gpu random_project-karaoke-clipper-gpu random_project-karaoke-clipper-streamlit-gpu
+	docker image prune -f
+
+docker-reset-gpu:
+	docker compose -f docker-compose.gpu.yml down --remove-orphans
+	-docker image rm -f karaoke-clipper:gpu random_project-karaoke-clipper-gpu random_project-karaoke-clipper-streamlit-gpu
+	docker image prune -f
+	docker compose -f docker-compose.gpu.yml build karaoke-clipper-streamlit-gpu
+	docker compose -f docker-compose.gpu.yml up karaoke-clipper-streamlit-gpu

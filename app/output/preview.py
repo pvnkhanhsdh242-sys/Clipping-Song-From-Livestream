@@ -19,6 +19,12 @@ class PreviewRecord:
     artist: str
     confidence: float
     backend: str
+    final_score: float
+    needs_review: bool
+    review_reason: str | None
+    boundary_method: str
+    refinement_method: str
+    music_ratio: float
 
     def to_row(self) -> Dict[str, object]:
         return {
@@ -31,6 +37,12 @@ class PreviewRecord:
             "artist": self.artist,
             "confidence": round(self.confidence, 4),
             "backend": self.backend,
+            "final_score": round(self.final_score, 4),
+            "needs_review": self.needs_review,
+            "review_reason": self.review_reason,
+            "boundary_method": self.boundary_method,
+            "refinement_method": self.refinement_method,
+            "music_ratio": round(self.music_ratio, 4),
         }
 
 

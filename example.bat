@@ -1,1 +1,0 @@
-python -m app.main --url "https://www.youtube.com/watch?v=3W8oc4NSv8Q&t=763s" --clip-resolution 1080p --expected-song-count 17 --min-segment 120 --merge-gap 25 --gdrive-upload true

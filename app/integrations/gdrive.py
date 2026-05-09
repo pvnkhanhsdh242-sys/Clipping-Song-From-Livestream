@@ -6,7 +6,7 @@ import logging
 import mimetypes
 import os
 from pathlib import Path
-from typing import Optional
+from typing import Iterable, Optional
 
 from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
@@ -169,6 +169,7 @@ def upload_clips_dir(
     client_secrets_path: Optional[Path],
     token_path: Path,
     logger: logging.Logger,
+    clip_files: Optional[Iterable[Path]] = None,
 ) -> str:
     """Upload only the `clips/` folder under a run output to the given Drive folder.
 
@@ -179,16 +180,30 @@ def upload_clips_dir(
     service = get_drive_service(client_secrets_path, token_path, logger)
     run_folder_id = ensure_drive_folder(service, output_dir.name, parent_folder_id, logger)
 
-    local_clips = (output_dir / "clips").resolve()
-    if not local_clips.exists():
-        logger.warning("No clips folder to upload at %s", local_clips)
-        return run_folder_id
-
     clips_folder_id = ensure_drive_folder(service, "clips", run_folder_id, logger)
 
-    # upload files directly under clips (no subfolders by design)
-    for item in sorted(local_clips.iterdir()):
-        if item.is_file() and not item.name.startswith("."):
-            upload_file(service, item, clips_folder_id, logger)
+    local_clips = (output_dir / "clips").resolve()
+    if clip_files is None:
+        if not local_clips.exists():
+            logger.warning("No clips folder to upload at %s", local_clips)
+            return run_folder_id
+
+        # upload files directly under clips (no subfolders by design)
+        for item in sorted(local_clips.iterdir()):
+            if item.is_file() and not item.name.startswith("."):
+                upload_file(service, item, clips_folder_id, logger)
+        return clips_folder_id
+
+    unique_files = {Path(item).resolve() for item in clip_files}
+    for item in sorted(unique_files):
+        if not item.exists():
+            logger.warning("Clip file missing for upload: %s", item)
+            continue
+        if item.is_dir() or item.name.startswith("."):
+            continue
+        if local_clips.exists() and local_clips not in item.parents:
+            logger.warning("Skipping clip outside clips folder: %s", item)
+            continue
+        upload_file(service, item, clips_folder_id, logger)
 
     return clips_folder_id

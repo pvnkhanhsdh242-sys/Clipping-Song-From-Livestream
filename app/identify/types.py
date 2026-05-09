@@ -15,3 +15,5 @@ class MatchResult:
     confidence: float
     backend: str
     track_id: Optional[str] = None
+    needs_review: bool = False
+    review_reason: Optional[str] = None

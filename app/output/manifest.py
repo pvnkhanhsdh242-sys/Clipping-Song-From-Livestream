@@ -17,8 +17,24 @@ class ManifestRecord:
     video_id: str
     song: str
     artist: str
+    raw_start_sec: float
+    raw_end_sec: float
     start_sec: float
     end_sec: float
+    duration_sec: float
+    pre_roll_sec: float
+    post_roll_sec: float
+    boundary_method: str
+    refinement_method: str
+    music_ratio: float
+    fingerprint_confidence: float
+    duration_score: float
+    boundary_quality_score: float
+    final_score: float
+    merge_count: int
+    bridged_gap_total_sec: float
+    needs_review: bool
+    review_reason: Optional[str]
     confidence: float
     clip_path: str
     backend: str
@@ -49,10 +65,26 @@ def write_manifests(records: Iterable[ManifestRecord], output_path_base: Path) -
         "video_id",
         "song",
         "artist",
+        "raw_start_sec",
+        "raw_end_sec",
         "start_sec",
         "end_sec",
+        "duration_sec",
         "start_tc",
         "end_tc",
+        "pre_roll_sec",
+        "post_roll_sec",
+        "boundary_method",
+        "refinement_method",
+        "music_ratio",
+        "fingerprint_confidence",
+        "duration_score",
+        "boundary_quality_score",
+        "final_score",
+        "merge_count",
+        "bridged_gap_total_sec",
+        "needs_review",
+        "review_reason",
         "confidence",
         "clip_path",
         "audio_path",
