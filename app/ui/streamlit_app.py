@@ -25,12 +25,14 @@ def _build_config(
     audio_clips: bool,
     min_segment: float,
     max_segment: float,
+    merge_max_segment: float,
     use_acoustid: bool,
     ref_library: str,
     device: str,
     sample_rate: int,
     merge_gap: float,
     exclude_start_seconds: float,
+    exclude_end_seconds: float,
     expected_song_count: int | None,
     clip_mode: str,
     clip_resolution: str,
@@ -52,12 +54,14 @@ def _build_config(
         audio_clips=audio_clips,
         min_segment=float(min_segment),
         max_segment=float(max_segment),
+        merge_max_segment=float(merge_max_segment),
         use_acoustid=use_acoustid,
         ref_library=Path(ref_library).expanduser().resolve() if ref_library else None,
         device=device,
         sample_rate=int(sample_rate),
         merge_gap=float(merge_gap),
         exclude_start_seconds=float(exclude_start_seconds),
+        exclude_end_seconds=float(exclude_end_seconds),
         expected_song_count=expected_song_count,
         clip_mode=clip_mode,
         clip_resolution=clip_resolution,
@@ -109,8 +113,16 @@ with col1:
     outdir_value = st.text_input("Output parent folder", value="output")
     min_segment = st.number_input("Min segment (sec)", min_value=1.0, value=8.0, step=1.0)
     max_segment = st.number_input("Max segment (sec)", min_value=1.0, value=240.0, step=1.0)
+    merge_max_segment = st.number_input(
+        "Merge max segment (sec)",
+        min_value=1.0,
+        value=float(max_segment),
+        step=1.0,
+        help="Cap for merging adjacent segments (use to keep merges smaller than clip max).",
+    )
     merge_gap = st.number_input("Merge gap (sec)", min_value=0.0, value=2.0, step=0.1)
     exclude_start_seconds = st.number_input("Exclude start (sec)", min_value=0.0, value=0.0, step=0.5)
+    exclude_end_seconds = st.number_input("Exclude end (sec)", min_value=0.0, value=0.0, step=0.5)
 
 with col2:
     clip_mode = st.selectbox("Clip mode", ["accurate", "fast"], index=0)
@@ -183,12 +195,14 @@ if preview_clicked:
             audio_clips=audio_clips,
             min_segment=min_segment,
             max_segment=max_segment,
+            merge_max_segment=merge_max_segment,
             use_acoustid=use_acoustid,
             ref_library=ref_library,
             device=device,
             sample_rate=sample_rate,
             merge_gap=merge_gap,
             exclude_start_seconds=exclude_start_seconds,
+            exclude_end_seconds=exclude_end_seconds,
             expected_song_count=expected_song_count,
             clip_mode=clip_mode,
             clip_resolution=clip_resolution,
@@ -208,6 +222,14 @@ if preview_clicked:
                 st.session_state["preview_records"] = [record.to_row() for record in preview_result.records]
                 st.session_state["preview_source_mode"] = source_mode
                 st.session_state["preview_source_url"] = url_value
+                # Sanity-check: ensure no preview record exceeds configured max segment length
+                oversized = [r for r in preview_result.records if (r.end_sec - r.start_sec) > config.max_segment]
+                if oversized:
+                    st.warning(
+                        "%d preview record(s) exceed max segment (%.2fs). If you recently changed code, restart Streamlit and preview again.",
+                        len(oversized),
+                        config.max_segment,
+                    )
             except Exception as exc:  # pragma: no cover - UI error handling
                 st.error(f"Preview failed: {exc}")
 
@@ -275,14 +297,15 @@ if "preview_records" in st.session_state and st.session_state["preview_records"]
     st.session_state.setdefault("pipeline_done", False)
 
     # Show button, processing status, or done status
-    col_button = st.container()
+    placeholder = st.empty()
     if st.session_state["is_processing"]:
         # Show processing status in yellow
         st.markdown("🟡 <span style='color: #FFD700;'>**Processing...**</span>", unsafe_allow_html=True)
-        st.progress(0.5)
+        placeholder.progress(0.5)
     elif st.session_state["pipeline_done"]:
-        # Show done status in green
+        # Show done status in green and clear any progress bar
         st.markdown("✅ <span style='color: #00AA00;'>**Done**</span>", unsafe_allow_html=True)
+        placeholder.empty()
     else:
         # Show normal run button
         run_clicked = st.button("Run full pipeline", width="stretch")
@@ -328,12 +351,14 @@ if st.session_state.get("is_processing") and st.session_state.get("preview_recor
                 audio_clips=audio_clips,
                 min_segment=min_segment,
                 max_segment=max_segment,
+                merge_max_segment=merge_max_segment,
                 use_acoustid=use_acoustid,
                 ref_library=ref_library,
                 device=device,
                 sample_rate=sample_rate,
                 merge_gap=merge_gap,
                 exclude_start_seconds=exclude_start_seconds,
+                exclude_end_seconds=exclude_end_seconds,
                 expected_song_count=expected_song_count,
                 clip_mode=clip_mode,
                 clip_resolution=clip_resolution,
@@ -346,9 +371,24 @@ if st.session_state.get("is_processing") and st.session_state.get("preview_recor
                 gdrive_upload_mode=gdrive_upload_mode,
             )
 
+            export_status = st.empty()
+            export_progress = st.empty()
+
+            def _on_export_progress(current: int, total: int, start_sec: float, end_sec: float) -> None:
+                if total <= 0:
+                    return
+                export_progress.progress(min(current / total, 1.0))
+                export_status.info(
+                    "Exporting clip %d/%d: %.2f -> %.2f",
+                    current,
+                    total,
+                    start_sec,
+                    end_sec,
+                )
+
             with st.spinner("Running pipeline..."):
                 try:
-                    result = run_pipeline(config)
+                    result = run_pipeline(config, progress_callback=_on_export_progress)
                     if result == 0:
                         st.success("Pipeline finished.")
                         st.session_state["pipeline_done"] = True
@@ -359,4 +399,6 @@ if st.session_state.get("is_processing") and st.session_state.get("preview_recor
                     st.error(f"Pipeline failed: {exc}")
                     st.session_state["pipeline_done"] = True
                 finally:
+                    export_status.empty()
+                    export_progress.empty()
                     st.session_state["is_processing"] = False

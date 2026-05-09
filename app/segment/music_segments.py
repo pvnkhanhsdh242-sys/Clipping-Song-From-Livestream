@@ -29,10 +29,14 @@ def merge_adjacent_segments(
     max_gap_sec: float,
     min_segment_sec: float,
     max_segment_sec: float,
+    merge_max_segment_sec: float | None = None,
+    logger: logging.Logger | None = None,
 ) -> List[Segment]:
     """Merge nearby segments and enforce min/max duration limits."""
     if not segments:
         return []
+
+    merge_cap_sec = merge_max_segment_sec if merge_max_segment_sec is not None else max_segment_sec
 
     ordered = sorted(segments, key=lambda s: s.start)
     merged: List[Segment] = [Segment(ordered[0].start, ordered[0].end, ordered[0].label, ordered[0].score)]
@@ -40,10 +44,21 @@ def merge_adjacent_segments(
     for seg in ordered[1:]:
         current = merged[-1]
         gap = seg.start - current.end
-        if gap <= max_gap_sec:
+        combined_duration = max(current.end, seg.end) - current.start
+        if gap <= max_gap_sec and combined_duration <= merge_cap_sec:
             current.end = max(current.end, seg.end)
             current.score = max(current.score, seg.score)
         else:
+            if gap <= max_gap_sec and combined_duration > merge_cap_sec and logger is not None:
+                logger.info(
+                    "Skipped merging adjacent segments at %.2fs-%.2fs and %.2fs-%.2fs: combined duration %.2fs would exceed merge cap %.2fs",
+                    current.start,
+                    current.end,
+                    seg.start,
+                    seg.end,
+                    combined_duration,
+                    merge_cap_sec,
+                )
             merged.append(Segment(seg.start, seg.end, seg.label, seg.score))
 
     clipped: List[Segment] = []
@@ -70,11 +85,15 @@ def coalesce_segments_to_expected_count(
     segments: List[Segment],
     expected_song_count: int,
     merge_gap_sec: float,
+    max_segment_sec: float,
     logger: logging.Logger,
+    merge_max_segment_sec: float | None = None,
 ) -> List[Segment]:
     """Best-effort merge of nearest neighbors until target song count is reached."""
     if expected_song_count <= 0 or len(segments) <= expected_song_count:
         return segments
+
+    merge_cap_sec = merge_max_segment_sec if merge_max_segment_sec is not None else max_segment_sec
 
     coalesced = [Segment(s.start, s.end, s.label, s.score) for s in sorted(segments, key=lambda seg: seg.start)]
     original_count = len(coalesced)
@@ -102,14 +121,32 @@ def coalesce_segments_to_expected_count(
     while len(coalesced) > expected_song_count:
         best_idx: int | None = None
         best_gap: float | None = None
+        skipped_oversized = 0
 
         for idx in range(len(coalesced) - 1):
             gap = coalesced[idx + 1].start - coalesced[idx].end
+            combined_duration = coalesced[idx + 1].end - coalesced[idx].start
+            if combined_duration > merge_cap_sec:
+                skipped_oversized += 1
+                continue
             if best_gap is None or gap < best_gap:
                 best_gap = gap
                 best_idx = idx
 
         if best_idx is None or best_gap is None:
+            if skipped_oversized:
+                logger.warning(
+                    "Expected-song merge stopped at %s segments (target=%s): all remaining candidate merges would exceed %.2fs",
+                    len(coalesced),
+                    expected_song_count,
+                    merge_cap_sec,
+                )
+            else:
+                logger.warning(
+                    "Expected-song merge stopped at %s segments (target=%s): no merge candidates remain",
+                    len(coalesced),
+                    expected_song_count,
+                )
             break
 
         if best_gap > max_bridge_gap_sec:
@@ -242,6 +279,77 @@ def _segments_with_energy_fallback(audio_path: Path, logger: logging.Logger) -> 
     return segments
 
 
+def _get_audio_duration(audio_path: Path, logger: logging.Logger) -> float | None:
+    try:
+        with wave.open(str(audio_path), "rb") as wav_handle:
+            sample_rate = wav_handle.getframerate()
+            frame_count = wav_handle.getnframes()
+        if sample_rate <= 0:
+            logger.warning("Unable to read audio duration from %s (invalid sample rate)", audio_path)
+            return None
+        return frame_count / float(sample_rate)
+    except Exception as exc:  # pragma: no cover - depends on input file
+        logger.warning("Unable to read audio duration for end exclusion: %s", exc)
+        return None
+
+
+def _apply_exclude_window(
+    segments: List[Segment],
+    exclude_start_seconds: float,
+    exclude_end_seconds: float,
+    audio_duration_sec: float | None,
+    logger: logging.Logger,
+) -> List[Segment]:
+    filtered = segments
+
+    if exclude_start_seconds and exclude_start_seconds > 0.0:
+        trimmed: List[Segment] = []
+        for seg in filtered:
+            if seg.end <= exclude_start_seconds:
+                # Entire segment falls within excluded head - drop it
+                continue
+            # Clamp start to the exclusion boundary but keep end in original timeline
+            new_start = max(seg.start, exclude_start_seconds)
+            if seg.end > new_start:
+                trimmed.append(Segment(new_start, seg.end, seg.label, seg.score))
+        logger.info(
+            "Excluding first %.2fs from segmentation: reduced raw regions %s -> %s",
+            exclude_start_seconds,
+            len(filtered),
+            len(trimmed),
+        )
+        filtered = trimmed
+
+    if exclude_end_seconds and exclude_end_seconds > 0.0:
+        if audio_duration_sec is None or audio_duration_sec <= 0.0:
+            logger.warning("Exclude end requested but audio duration unavailable; skipping tail exclusion.")
+        else:
+            end_cutoff = max(0.0, audio_duration_sec - exclude_end_seconds)
+            if end_cutoff <= 0.0:
+                logger.warning(
+                    "Exclude end %.2fs covers entire audio (duration %.2fs); dropping all segments.",
+                    exclude_end_seconds,
+                    audio_duration_sec,
+                )
+                return []
+            trimmed: List[Segment] = []
+            for seg in filtered:
+                if seg.start >= end_cutoff:
+                    continue
+                new_end = min(seg.end, end_cutoff)
+                if new_end > seg.start:
+                    trimmed.append(Segment(seg.start, new_end, seg.label, seg.score))
+            logger.info(
+                "Excluding last %.2fs from segmentation: reduced raw regions %s -> %s",
+                exclude_end_seconds,
+                len(filtered),
+                len(trimmed),
+            )
+            filtered = trimmed
+
+    return filtered
+
+
 def detect_music_segments(
     audio_path: Path,
     min_segment_sec: float,
@@ -249,7 +357,9 @@ def detect_music_segments(
     merge_gap_sec: float,
     expected_song_count: int | None,
     logger: logging.Logger,
+    merge_max_segment_sec: float | None = None,
     exclude_start_seconds: float = 0.0,
+    exclude_end_seconds: float = 0.0,
 ) -> List[Segment]:
     """Detect candidate music regions from the working WAV file."""
     base_segments: List[Segment]
@@ -268,29 +378,25 @@ def detect_music_segments(
         logger.warning("inaSpeechSegmenter unavailable or failed: %s.%s", exc, hint)
         base_segments = _segments_with_energy_fallback(audio_path, logger)
 
-    # Optionally ignore an initial duration of the audio for segmentation
-    if exclude_start_seconds and exclude_start_seconds > 0.0:
-        filtered: List[Segment] = []
-        for seg in base_segments:
-            if seg.end <= exclude_start_seconds:
-                # Entire segment falls within excluded head - drop it
-                continue
-            # Clamp start to the exclusion boundary but keep end in original timeline
-            new_start = max(seg.start, exclude_start_seconds)
-            filtered.append(Segment(new_start, seg.end, seg.label, seg.score))
-        logger.info(
-            "Excluding first %.2fs from segmentation: reduced raw regions %s -> %s",
-            exclude_start_seconds,
-            len(base_segments),
-            len(filtered),
-        )
-        base_segments = filtered
+    audio_duration_sec = None
+    if exclude_end_seconds and exclude_end_seconds > 0.0:
+        audio_duration_sec = _get_audio_duration(audio_path, logger)
+
+    base_segments = _apply_exclude_window(
+        base_segments,
+        exclude_start_seconds=exclude_start_seconds,
+        exclude_end_seconds=exclude_end_seconds,
+        audio_duration_sec=audio_duration_sec,
+        logger=logger,
+    )
 
     merged = merge_adjacent_segments(
         base_segments,
         max_gap_sec=merge_gap_sec,
         min_segment_sec=min_segment_sec,
         max_segment_sec=max_segment_sec,
+        merge_max_segment_sec=merge_max_segment_sec,
+        logger=logger,
     )
 
     if expected_song_count is not None:
@@ -298,6 +404,8 @@ def detect_music_segments(
             merged,
             expected_song_count=expected_song_count,
             merge_gap_sec=merge_gap_sec,
+            max_segment_sec=max_segment_sec,
+            merge_max_segment_sec=merge_max_segment_sec,
             logger=logger,
         )
 

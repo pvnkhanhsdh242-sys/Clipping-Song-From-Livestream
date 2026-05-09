@@ -22,6 +22,43 @@ def test_merge_adjacent_segments_and_filter():
     assert merged[0].end == 12.0
 
 
+def test_merge_adjacent_segments_skips_oversized_merge():
+    segments = [
+        Segment(0.0, 20.0, score=0.7),
+        Segment(21.0, 45.0, score=0.8),
+    ]
+
+    merged = merge_adjacent_segments(
+        segments,
+        max_gap_sec=2.0,
+        min_segment_sec=4.0,
+        max_segment_sec=30.0,
+    )
+
+    assert len(merged) == 2
+    assert merged[0].start == 0.0
+    assert merged[0].end == 20.0
+    assert merged[1].start == 21.0
+    assert merged[1].end == 45.0
+
+
+def test_merge_adjacent_segments_respects_merge_cap():
+    segments = [
+        Segment(0.0, 20.0, score=0.7),
+        Segment(21.0, 45.0, score=0.8),
+    ]
+
+    merged = merge_adjacent_segments(
+        segments,
+        max_gap_sec=2.0,
+        min_segment_sec=4.0,
+        max_segment_sec=120.0,
+        merge_max_segment_sec=30.0,
+    )
+
+    assert len(merged) == 2
+
+
 def test_split_overly_long_segment():
     segments = [Segment(0.0, 70.0, score=0.9)]
     merged = merge_adjacent_segments(
@@ -48,6 +85,7 @@ def test_coalesce_to_expected_song_count_merges_smallest_gaps_first():
         segments,
         expected_song_count=2,
         merge_gap_sec=2.0,
+        max_segment_sec=240.0,
         logger=logging.getLogger("test"),
     )
 
@@ -67,6 +105,7 @@ def test_coalesce_to_expected_song_count_respects_large_pauses():
         segments,
         expected_song_count=1,
         merge_gap_sec=2.0,
+        max_segment_sec=240.0,
         logger=logging.getLogger("test"),
     )
 
@@ -85,9 +124,28 @@ def test_coalesce_to_expected_song_count_adapts_gap_threshold():
         segments,
         expected_song_count=1,
         merge_gap_sec=2.0,
+        max_segment_sec=240.0,
         logger=logging.getLogger("test"),
     )
 
     assert len(merged) == 1
     assert merged[0].start == 0.0
     assert merged[0].end == 90.0
+
+
+def test_coalesce_to_expected_song_count_skips_oversized_merge():
+    segments = [
+        Segment(0.0, 20.0, score=0.8),
+        Segment(21.0, 45.0, score=0.8),
+        Segment(46.0, 60.0, score=0.8),
+    ]
+
+    merged = coalesce_segments_to_expected_count(
+        segments,
+        expected_song_count=1,
+        merge_gap_sec=2.0,
+        max_segment_sec=30.0,
+        logger=logging.getLogger("test"),
+    )
+
+    assert len(merged) == 3

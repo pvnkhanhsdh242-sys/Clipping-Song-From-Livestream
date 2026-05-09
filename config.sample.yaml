@@ -3,6 +3,7 @@ pipeline:
   audio_clips: false
   min_segment: 8.0
   max_segment: 240.0
+  merge_max_segment: 240.0
   merge_gap: 2.0
   expected_song_count: null
   sample_rate: 16000
@@ -17,3 +18,4 @@ pipeline:
   gdrive_token: secret/token.json
   gdrive_include_tmp: false
   exclude_start_seconds: 0.0
+  exclude_end_seconds: 0.0

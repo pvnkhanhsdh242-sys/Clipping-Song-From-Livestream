@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Sequence
+from typing import Callable, Sequence
 
 from app.align.whisperx_align import WhisperXRefiner
 from app.clip.cutter import export_clip
@@ -58,6 +58,55 @@ class PreviewResult:
     output_root: Path
     preview_dir: Path
     snapshots: list[Path]
+
+
+def _split_oversized_analyses(
+    analyses: list[SegmentAnalysis],
+    max_segment_sec: float,
+    logger,
+) -> list[SegmentAnalysis]:
+    if max_segment_sec <= 0:
+        return analyses
+
+    split: list[SegmentAnalysis] = []
+    next_index = 1
+
+    for analysis in analyses:
+        base_start = analysis.refined_start if analysis.refined_end > analysis.refined_start else analysis.start
+        base_end = analysis.refined_end if analysis.refined_end > analysis.refined_start else analysis.end
+
+        if base_end <= base_start:
+            base_start, base_end = analysis.start, analysis.end
+
+        cursor = base_start
+        chunk_count = 0
+        while cursor < base_end:
+            next_end = min(cursor + max_segment_sec, base_end)
+            split.append(
+                SegmentAnalysis(
+                    index=next_index,
+                    start=analysis.start,
+                    end=analysis.end,
+                    refined_start=cursor,
+                    refined_end=next_end,
+                    match=analysis.match,
+                    confidence=analysis.confidence,
+                )
+            )
+            next_index += 1
+            chunk_count += 1
+            cursor = next_end
+
+        if chunk_count > 1:
+            logger.info(
+                "Split oversized segment %.3f -> %.3f into %s clips capped at %.2fs",
+                base_start,
+                base_end,
+                chunk_count,
+                max_segment_sec,
+            )
+
+    return split
 
 
 def _resolve_source(config: AppConfig, vods_dir: Path, logger) -> SourceVideo:
@@ -164,7 +213,10 @@ def _maybe_upload_outputs(config: AppConfig, run_output_root: Path, logger) -> N
         logger.warning("Google Drive upload failed: %s", exc)
 
 
-def run_pipeline(config: AppConfig) -> int:
+def run_pipeline(
+    config: AppConfig,
+    progress_callback: Callable[[int, int, float, float], None] | None = None,
+) -> int:
     run_output_root = _resolve_run_output_root(config)
     output_dirs = prepare_output_dirs(run_output_root)
     log_path = output_dirs["logs"] / f"run_{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')}.log"
@@ -186,7 +238,9 @@ def run_pipeline(config: AppConfig) -> int:
         merge_gap_sec=config.merge_gap,
         expected_song_count=config.expected_song_count,
         logger=logger,
+        merge_max_segment_sec=config.merge_max_segment,
         exclude_start_seconds=config.exclude_start_seconds,
+        exclude_end_seconds=config.exclude_end_seconds,
     )
 
     matcher = ChromaprintMatcher(config.ref_library, config.fingerprint_threshold, logger)
@@ -194,13 +248,31 @@ def run_pipeline(config: AppConfig) -> int:
     refiner = WhisperXRefiner(device=config.device, logger=logger)
 
     analyses = _analyze_segments(segments, working_audio, output_dirs, matcher, acoustid, refiner, logger)
+    analyses = _split_oversized_analyses(analyses, config.max_segment, logger)
     records: list[ManifestRecord] = []
 
+    total_clips = len(analyses)
     for analysis in analyses:
         label = f"song_{analysis.index:03d}"
         if analysis.match is not None:
             label = sanitize_filename_component(
                 f"{analysis.match.artist} - {analysis.match.song}__{analysis.index:03d}"
+            )
+
+        logger.info(
+            "Exporting clip %s/%s: %.3f -> %.3f",
+            analysis.index,
+            total_clips,
+            analysis.refined_start,
+            analysis.refined_end,
+        )
+
+        if progress_callback is not None:
+            progress_callback(
+                analysis.index,
+                total_clips,
+                analysis.refined_start,
+                analysis.refined_end,
             )
 
         clip = export_clip(
@@ -262,7 +334,9 @@ def preview_pipeline(config: AppConfig, snapshot_limit: int = 0) -> PreviewResul
         merge_gap_sec=config.merge_gap,
         expected_song_count=config.expected_song_count,
         logger=logger,
+        merge_max_segment_sec=config.merge_max_segment,
         exclude_start_seconds=config.exclude_start_seconds,
+        exclude_end_seconds=config.exclude_end_seconds,
     )
 
     matcher = ChromaprintMatcher(config.ref_library, config.fingerprint_threshold, logger)
@@ -270,6 +344,7 @@ def preview_pipeline(config: AppConfig, snapshot_limit: int = 0) -> PreviewResul
     refiner = WhisperXRefiner(device=config.device, logger=logger)
 
     analyses = _analyze_segments(segments, working_audio, output_dirs, matcher, acoustid, refiner, logger)
+    analyses = _split_oversized_analyses(analyses, config.max_segment, logger)
     preview_records = [analysis.to_preview() for analysis in analyses]
     logger.info("Preview generated %s candidate segments", len(preview_records))
 

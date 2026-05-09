@@ -36,6 +36,7 @@ class AppConfig:
     device: str
     sample_rate: int
     merge_gap: float
+    merge_max_segment: float
     expected_song_count: Optional[int]
     clip_mode: str
     clip_resolution: str
@@ -48,6 +49,7 @@ class AppConfig:
     gdrive_include_tmp: bool
     gdrive_upload_mode: str
     exclude_start_seconds: float
+    exclude_end_seconds: float
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -73,6 +75,12 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--device", choices=["cpu", "cuda"], default="cpu", help="WhisperX device")
     parser.add_argument("--sample-rate", type=int, default=16000, help="Working WAV sample rate")
     parser.add_argument("--merge-gap", type=float, default=2.0, help="Merge candidate regions with <= this gap")
+    parser.add_argument(
+        "--merge-max-segment",
+        type=float,
+        default=None,
+        help="Maximum length allowed when merging adjacent segments (defaults to --max-segment)",
+    )
     parser.add_argument(
         "--expected-song-count",
         type=int,
@@ -133,6 +141,12 @@ def build_parser() -> argparse.ArgumentParser:
         default=0.0,
         help="Seconds at start of audio to ignore for segmentation",
     )
+    parser.add_argument(
+        "--exclude-end-seconds",
+        type=float,
+        default=0.0,
+        help="Seconds at end of audio to ignore for segmentation",
+    )
 
     return parser
 
@@ -146,6 +160,10 @@ def load_config(argv: Optional[Sequence[str]] = None) -> AppConfig:
         parser.error("--min-segment must be > 0")
     if args.max_segment <= args.min_segment:
         parser.error("--max-segment must be greater than --min-segment")
+    if args.merge_max_segment is not None and args.merge_max_segment <= 0:
+        parser.error("--merge-max-segment must be > 0")
+    if args.exclude_end_seconds is not None and args.exclude_end_seconds < 0:
+        parser.error("--exclude-end-seconds must be >= 0")
     if args.expected_song_count is not None and args.expected_song_count <= 0:
         parser.error("--expected-song-count must be > 0")
 
@@ -181,6 +199,8 @@ def load_config(argv: Optional[Sequence[str]] = None) -> AppConfig:
     )
     gdrive_token_value = os.getenv("GDRIVE_TOKEN") or args.gdrive_token
 
+    merge_max_segment = args.merge_max_segment if args.merge_max_segment is not None else args.max_segment
+
     return AppConfig(
         url=args.url,
         file=file_path,
@@ -193,6 +213,7 @@ def load_config(argv: Optional[Sequence[str]] = None) -> AppConfig:
         device=args.device,
         sample_rate=int(args.sample_rate),
         merge_gap=float(args.merge_gap),
+        merge_max_segment=float(merge_max_segment),
         expected_song_count=args.expected_song_count,
         clip_mode=args.clip_mode,
         clip_resolution=args.clip_resolution,
@@ -209,4 +230,5 @@ def load_config(argv: Optional[Sequence[str]] = None) -> AppConfig:
         gdrive_include_tmp=bool(args.gdrive_include_tmp),
         gdrive_upload_mode=str(args.gdrive_upload_mode),
         exclude_start_seconds=float(args.exclude_start_seconds),
+        exclude_end_seconds=float(args.exclude_end_seconds),
     )
