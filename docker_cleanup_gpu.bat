@@ -42,16 +42,22 @@ for %%I in (
 )
 
 if "%PURGE_PROJECT_IMAGE%"=="1" (
-    echo Optional purge: removing project runtime image karaoke-clipper:gpu
-    docker image inspect "karaoke-clipper:gpu" >nul 2>&1
-    if not errorlevel 1 (
-        docker image rm -f "karaoke-clipper:gpu" >nul 2>&1
-    ) else (
-        echo Image not found: karaoke-clipper:gpu
+    echo Optional purge: removing project GPU image tags
+    for %%I in (
+        "karaoke-clipper:gpu"
+        "karaoke-clipper:train-gpu"
+        "karaoke-clipper:gpu-full-ml"
+    ) do (
+        docker image inspect "%%~I" >nul 2>&1
+        if not errorlevel 1 (
+            docker image rm -f "%%~I" >nul 2>&1
+        ) else (
+            echo Image not found: %%~I
+        )
     )
 ) else (
-    echo Keeping supported images: karaoke-clipper:gpu and pytorch/pytorch:2.4.1-cuda12.1-cudnn9-runtime
-    echo Tip: add --purge-project-image if you want to remove karaoke-clipper:gpu too.
+    echo Keeping supported images: karaoke-clipper:gpu, karaoke-clipper:train-gpu, and pytorch/pytorch:2.4.1-cuda12.1-cudnn9-runtime
+    echo Tip: add --purge-project-image if you want to remove project GPU tags too.
 )
 
 echo [3/4] Pruning dangling layers...

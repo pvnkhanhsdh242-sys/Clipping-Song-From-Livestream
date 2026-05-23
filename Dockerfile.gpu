@@ -1,5 +1,5 @@
 ARG GPU_IMAGE_PLATFORM=linux/amd64
-FROM --platform=${GPU_IMAGE_PLATFORM} pytorch/pytorch:2.4.1-cuda12.1-cudnn9-runtime
+FROM --platform=${GPU_IMAGE_PLATFORM} pytorch/pytorch:2.4.1-cuda12.1-cudnn9-runtime AS runtime-gpu
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
@@ -26,10 +26,19 @@ RUN apt-get update \
     fi \
     && rm -rf /var/lib/apt/lists/*
 
-COPY requirements.txt requirements-ml.txt ./
+COPY requirements.txt ./
 RUN pip install --upgrade pip \
-    && pip install -r requirements.txt \
-    && pip install -r requirements-ml.txt
+    && pip install -r requirements.txt
+
+FROM runtime-gpu AS full-ml
+
+COPY requirements-ml.txt constraints-ml-gpu.txt ./
+RUN pip install -r requirements-ml.txt -c constraints-ml-gpu.txt
+COPY . .
+
+CMD ["python", "scripts/container_runtime.py", "pipeline", "--", "--help"]
+
+FROM runtime-gpu AS base-gpu
 
 COPY . .
 

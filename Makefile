@@ -24,12 +24,12 @@ else
 	VENV_PYTHON := $(VENV_DIR)/bin/python
 endif
 
-.PHONY: setup run-url run-file test docker-build docker-run docker-build-gpu docker-run-gpu docker-compose-gpu docker-streamlit-gpu docker-rebuild-gpu docker-healthcheck-gpu docker-clean-gpu docker-reset-gpu
+.PHONY: setup run-url run-file test docker-build docker-run docker-build-gpu docker-run-gpu docker-build-train-gpu docker-build-gpu-full-ml docker-train-gpu docker-compose-gpu docker-streamlit-gpu docker-rebuild-gpu docker-healthcheck-gpu docker-clean-gpu docker-reset-gpu
 
 setup:
 	$(PYTHON) -m venv $(VENV_DIR)
 	$(VENV_PYTHON) -m pip install --upgrade pip
-	$(VENV_PYTHON) -m pip install -r requirements.txt
+	$(VENV_PYTHON) -m pip install -r requirements-dev.txt
 	@echo "Base setup complete. Optional: install -r requirements-ml.txt for inaSpeechSegmenter and WhisperX."
 
 run-url:
@@ -48,10 +48,19 @@ docker-run:
 	docker run --rm -it -v "${PWD}/output:/app/output" -v "${PWD}/data:/app/data" karaoke-clipper:latest
 
 docker-build-gpu:
-	docker build -f Dockerfile.gpu -t karaoke-clipper:gpu .
+	docker build -f Dockerfile.gpu --target base-gpu -t karaoke-clipper:gpu -t karaoke-clipper:train-gpu .
 
 docker-run-gpu:
 	docker run --rm -it --gpus all -v "${PWD}/output:/app/output" -v "${PWD}/data:/app/data" -v "${PWD}/secret:/app/secret" karaoke-clipper:gpu python scripts/container_runtime.py pipeline -- $(RUN_ARGS)
+
+docker-build-train-gpu:
+	docker build -f Dockerfile.gpu --target base-gpu -t karaoke-clipper:gpu -t karaoke-clipper:train-gpu .
+
+docker-build-gpu-full-ml:
+	docker build -f Dockerfile.gpu --target full-ml -t karaoke-clipper:gpu-full-ml .
+
+docker-train-gpu:
+	docker run --rm --gpus all -v "${PWD}/output:/app/output" -v "${PWD}/data:/app/data" -v "${PWD}/secret:/app/secret" -v "${PWD}/.cache:/app/.cache" karaoke-clipper:train-gpu python scripts/container_runtime.py run --require-cuda -- python scripts/train_singing_model_all.py --backend pytorch --device cuda --epochs 5 $(RUN_ARGS)
 
 docker-compose-gpu:
 	docker compose -f docker-compose.gpu.yml up karaoke-clipper-streamlit-gpu

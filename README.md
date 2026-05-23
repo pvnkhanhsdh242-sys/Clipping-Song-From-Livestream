@@ -90,6 +90,8 @@ Make sure these tools are available on your machine:
 make setup
 ```
 
+`make setup` installs `requirements-dev.txt`, which includes runtime packages plus test tooling. Runtime-only installs can use `requirements.txt`.
+
 ### 3. Optional: install the ML stack
 
 Use this when you want stronger segmentation and WhisperX-based refinement.
@@ -102,7 +104,7 @@ Use this when you want stronger segmentation and WhisperX-based refinement.
 .venv/bin/python -m pip install -r requirements-ml.txt
 ```
 
-> Optional ML extras such as `inaSpeechSegmenter` and `whisperx` may require a Python version that supports TensorFlow wheels. Python 3.9–3.12 is recommended for those extras.
+> Optional ML extras such as `inaSpeechSegmenter` and `whisperx` may require a Python version that supports TensorFlow wheels. Python 3.9-3.12 is recommended for those extras.
 
 ### 4. Build a local fingerprint library
 
@@ -128,6 +130,20 @@ python scripts/train_singing_candidate_model.py \
   --output-dir data/models/singing_candidate \
   --epochs 1000
 ```
+
+To build training manifests from all active `output/*/clips` folders, auto-generate VOD-gap negatives when needed, and train the default sklearn model:
+
+```powershell
+.\train_singing_model_all.bat
+```
+
+The optional PyTorch backend trains a small log-spectrogram CNN. Native Windows uses CPU unless your local PyTorch install has CUDA enabled:
+
+```powershell
+.\.venv\Scripts\python.exe scripts\train_singing_model_all.py --backend pytorch --device auto --epochs 5
+```
+
+For GPU training, use the Docker/WSL2 path shown in [Docker GPU build (CUDA)](#docker-gpu-build-cuda).
 
 Rerun with model scoring:
 
@@ -267,7 +283,7 @@ Notes:
 | `--music-ratio-threshold <0-1>` | Drop segments with `music_ratio` below this value. |
 | `--fingerprint-threshold <0-1>` | Local matching confidence threshold. |
 | `--singing-model-mode off\|score\|filter` | Disable model scoring, score only, or filter low-score candidates. |
-| `--singing-model-path <path>` | Directory with `model.joblib` and `metadata.json`, or direct `.joblib` path. |
+| `--singing-model-path <path>` | Directory with `model.joblib` or `model.pt` plus `metadata.json`, or a direct artifact path. |
 | `--singing-score-threshold <0-1>` | Threshold used for singing review/filter decisions. |
 | `--gdrive-upload true\|false` | Enable Google Drive upload. |
 | `--gdrive-folder-id <id>` | Target Drive folder ID or URL. |
@@ -377,12 +393,14 @@ Requirements:
 - Docker Desktop / Docker Engine with GPU support enabled
 - NVIDIA Container Toolkit available to Docker (`docker run --gpus all ...` works)
 
-Build and run GPU image:
+Build and run the lean shared GPU image:
 
 ```bash
 make docker-build-gpu
 make docker-run-gpu
 ```
+
+`make docker-build-gpu` tags the same image as both `karaoke-clipper:gpu` and `karaoke-clipper:train-gpu`, so Streamlit/app and singing training share Docker layers.
 
 Rebuild GPU image explicitly (only when dependencies/Dockerfile changed):
 
@@ -396,6 +414,42 @@ Run CUDA visibility healthcheck only:
 make docker-healthcheck-gpu
 ```
 
+Build the dedicated training image and train the PyTorch singing backend:
+
+```powershell
+.\docker_train_singing_gpu.bat --build
+.\docker_train_singing_gpu.bat
+.\docker_train_singing_gpu.bat --epochs 20 --batch-size 8 --window-sec 12
+```
+
+Equivalent make targets:
+
+```bash
+make docker-build-train-gpu
+make docker-train-gpu RUN_ARGS="--epochs 20 --batch-size 8 --window-sec 12"
+```
+
+`make docker-build-train-gpu` builds the same lean image as `make docker-build-gpu`; it only exists as a training-oriented shortcut.
+
+Optional full-ML GPU image for WhisperX/inaSpeechSegmenter:
+
+```bash
+make docker-build-gpu-full-ml
+docker compose -f docker-compose.gpu.yml --profile full-ml up karaoke-clipper-streamlit-gpu-full-ml
+```
+
+Compose training profile:
+
+```bash
+docker compose -f docker-compose.gpu.yml --profile train up karaoke-clipper-train-gpu
+```
+
+Verify CUDA is visible before training:
+
+```powershell
+docker run --rm --gpus all karaoke-clipper:train-gpu python scripts/container_runtime.py healthcheck --require-cuda
+```
+
 Start dedicated GPU Streamlit service (auto starts UI at http://localhost:8501):
 
 ```bash
@@ -406,6 +460,7 @@ If `make` is unavailable on Windows, use:
 
 ```bash
 docker_run_gpu.bat
+docker_train_singing_gpu.bat
 docker_healthcheck_gpu.bat
 docker_streamlit_gpu.bat
 docker_cleanup_gpu.bat
@@ -439,7 +494,7 @@ make docker-reset-gpu
 Direct Docker commands (cross-platform):
 
 ```bash
-docker build -f Dockerfile.gpu -t karaoke-clipper:gpu .
+docker build -f Dockerfile.gpu --target base-gpu -t karaoke-clipper:gpu -t karaoke-clipper:train-gpu .
 docker run --rm -it --gpus all -v "${PWD}/output:/app/output" -v "${PWD}/data:/app/data" -v "${PWD}/secret:/app/secret" karaoke-clipper:gpu
 ```
 
@@ -451,11 +506,14 @@ make docker-compose-gpu
 
 Notes:
 
-- GPU image uses [Dockerfile.gpu](Dockerfile.gpu) and installs both base + ML requirements.
-- Compose and direct Docker now share one GPU image tag: `karaoke-clipper:gpu`.
+- The default GPU image uses [Dockerfile.gpu](Dockerfile.gpu) target `base-gpu` and installs runtime requirements only.
+- `karaoke-clipper:gpu` and `karaoke-clipper:train-gpu` should point to the same image ID after a shared build.
+- Optional WhisperX/inaSpeechSegmenter dependencies are isolated in `karaoke-clipper:gpu-full-ml`.
 - `scripts/container_runtime.py` runs a CUDA healthcheck before app startup.
 - If CUDA is visible, runtime is forced to `cuda`; otherwise it falls back to `cpu` automatically.
 - In Streamlit container mode, device selection is locked to the forced runtime device.
+- Singing CNN training uses GPU only for PyTorch model work. FFmpeg cutting and audio extraction still run on CPU.
+- After verifying the shared image, remove old dangling 26 GB project images with `docker image prune -f` or `docker_cleanup_gpu.bat --deep`.
 
 ## Working status, fallbacks, and limitations
 

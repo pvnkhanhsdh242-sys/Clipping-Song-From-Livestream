@@ -102,12 +102,39 @@ def train_singing_candidate_model(
     manifest_paths: Sequence[Path],
     output_dir: Path,
     *,
+    backend: str = "sklearn",
     validation_size: float = 0.25,
     random_state: int = 13,
     max_iter: int = 1000,
+    device: str = "auto",
+    batch_size: int = 8,
+    learning_rate: float = 1e-3,
+    window_sec: float = 12.0,
+    windows_per_clip: int = 4,
     logger: logging.Logger | None = None,
 ) -> TrainingResult:
-    """Train and persist a CPU baseline singing candidate classifier."""
+    """Train and persist a singing candidate classifier artifact."""
+    backend = str(backend or "sklearn").lower()
+    if backend == "pytorch":
+        from app.singing.pytorch_backend import train_pytorch_singing_candidate_model
+
+        return train_pytorch_singing_candidate_model(
+            manifest_paths,
+            output_dir,
+            validation_size=validation_size,
+            random_state=random_state,
+            epochs=max_iter,
+            device=device,
+            batch_size=batch_size,
+            learning_rate=learning_rate,
+            window_sec=window_sec,
+            windows_per_clip=windows_per_clip,
+            logger=logger,
+            result_factory=TrainingResult,
+        )
+    if backend != "sklearn":
+        raise ValueError("backend must be one of sklearn or pytorch")
+
     try:
         import joblib  # type: ignore
         import numpy as np  # type: ignore
@@ -207,7 +234,9 @@ def train_singing_candidate_model(
 
     metadata = {
         "schema_version": 1,
+        "backend": "sklearn",
         "model_type": model_type,
+        "model_file": "model.joblib",
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "feature_names": FEATURE_NAMES,
         "label_column": "label_singing",

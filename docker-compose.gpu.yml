@@ -3,6 +3,7 @@ x-gpu-common: &gpu-common
   build:
     context: .
     dockerfile: Dockerfile.gpu
+    target: base-gpu
     args:
       GPU_IMAGE_PLATFORM: ${DOCKER_GPU_PLATFORM:-linux/amd64}
   platform: ${DOCKER_GPU_PLATFORM:-linux/amd64}
@@ -39,3 +40,43 @@ services:
     <<: *gpu-common
     profiles: ["cli"]
     command: ["python", "scripts/container_runtime.py", "pipeline", "--", "--help"]
+
+  karaoke-clipper-train-gpu:
+    <<: *gpu-common
+    profiles: ["train"]
+    command:
+      [
+        "python",
+        "scripts/container_runtime.py",
+        "run",
+        "--require-cuda",
+        "--",
+        "python",
+        "scripts/train_singing_model_all.py",
+        "--backend",
+        "pytorch",
+        "--device",
+        "cuda",
+        "--epochs",
+        "5",
+      ]
+    healthcheck:
+      test: ["CMD", "python", "scripts/container_runtime.py", "healthcheck", "--require-cuda"]
+      interval: 30s
+      timeout: 15s
+      retries: 3
+      start_period: 20s
+
+  karaoke-clipper-streamlit-gpu-full-ml:
+    <<: *gpu-common
+    image: karaoke-clipper:gpu-full-ml
+    build:
+      context: .
+      dockerfile: Dockerfile.gpu
+      target: full-ml
+      args:
+        GPU_IMAGE_PLATFORM: ${DOCKER_GPU_PLATFORM:-linux/amd64}
+    profiles: ["full-ml"]
+    ports:
+      - "8501:8501"
+    command: ["python", "scripts/container_runtime.py", "streamlit"]

@@ -3,7 +3,7 @@
 Thanks for improving karaoke-clipper.
 
 ## Local Setup
-1. Run `make setup`
+1. Run `make setup` to install runtime + test dependencies from `requirements-dev.txt`
 2. Optional full stack: install `requirements-ml.txt`
 3. Create `.env` from `.env.example`
 

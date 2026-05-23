@@ -34,6 +34,7 @@ class SingingCandidateScorer:
         self.logger = logger
         self.model = None
         self.model_name = "none"
+        self.backend = "none"
         self.feature_names = list(FEATURE_NAMES)
 
         if self.mode == "off":
@@ -60,9 +61,34 @@ class SingingCandidateScorer:
 
     def _load(self, model_path: Path) -> None:
         artifact_path = model_path.expanduser().resolve()
-        model_file = artifact_path / "model.joblib" if artifact_path.is_dir() else artifact_path
         metadata_file = artifact_path / "metadata.json" if artifact_path.is_dir() else artifact_path.with_suffix(".metadata.json")
+        metadata: dict[str, object] = {}
+        if metadata_file.exists():
+            with metadata_file.open("r", encoding="utf-8") as fh:
+                loaded = json.load(fh)
+            if isinstance(loaded, dict):
+                metadata = loaded
 
+        backend = str(metadata.get("backend") or "").lower()
+        model_type = str(metadata.get("model_type") or "")
+        if backend == "pytorch" or model_type.startswith("pytorch") or artifact_path.suffix.lower() == ".pt":
+            self._load_pytorch(artifact_path, metadata)
+            return
+
+        if artifact_path.is_dir():
+            model_file_name = str(metadata.get("model_file") or "model.joblib")
+            model_file = artifact_path / model_file_name
+            if not model_file.exists() and (artifact_path / "model.pt").exists() and not (artifact_path / "model.joblib").exists():
+                self._load_pytorch(artifact_path, metadata)
+                return
+            if not model_file.exists():
+                model_file = artifact_path / "model.joblib"
+        else:
+            model_file = artifact_path
+
+        self._load_sklearn(model_file, metadata)
+
+    def _load_sklearn(self, model_file: Path, metadata: dict[str, object]) -> None:
         if not model_file.exists():
             self.logger.warning("Singing model file not found: %s; scoring disabled.", model_file)
             self.model_name = "missing"
@@ -75,18 +101,39 @@ class SingingCandidateScorer:
             self.model_name = "dependency_missing"
             return
 
-        metadata: dict[str, object] = {}
-        if metadata_file.exists():
-            with metadata_file.open("r", encoding="utf-8") as fh:
-                loaded = json.load(fh)
-            if isinstance(loaded, dict):
-                metadata = loaded
-
         self.model = joblib.load(model_file)
         feature_names = metadata.get("feature_names")
         if isinstance(feature_names, list) and all(isinstance(name, str) for name in feature_names):
             self.feature_names = list(feature_names)
+        self.backend = "sklearn"
         self.model_name = str(metadata.get("model_type") or model_file.stem)
+        self.logger.info("Loaded singing candidate model %s from %s", self.model_name, model_file)
+
+    def _load_pytorch(self, artifact_path: Path, metadata: dict[str, object]) -> None:
+        if artifact_path.is_dir():
+            model_file_name = str(metadata.get("model_file") or "model.pt")
+            model_file = artifact_path / model_file_name
+            if not model_file.exists():
+                model_file = artifact_path / "model.pt"
+        else:
+            model_file = artifact_path
+
+        if not model_file.exists():
+            self.logger.warning("Singing PyTorch model file not found: %s; scoring disabled.", model_file)
+            self.model_name = "missing"
+            return
+
+        try:
+            from app.singing.pytorch_backend import PyTorchCandidateModel
+
+            self.model = PyTorchCandidateModel.load(model_file, metadata, device="auto")
+        except Exception as exc:  # pragma: no cover - dependency/runtime dependent
+            self.logger.warning("Unable to load PyTorch singing model %s: %s", model_file, exc)
+            self.model_name = "dependency_missing"
+            return
+
+        self.backend = "pytorch"
+        self.model_name = getattr(self.model, "model_name", str(metadata.get("model_type") or model_file.stem))
         self.logger.info("Loaded singing candidate model %s from %s", self.model_name, model_file)
 
     def score_features(self, features: Mapping[str, float]) -> SingingScoreResult:
@@ -94,6 +141,8 @@ class SingingCandidateScorer:
             return SingingScoreResult(score=None, model_name="none", decision="disabled")
         if self.model is None:
             return SingingScoreResult(score=None, model_name=self.model_name, decision="unavailable")
+        if self.backend == "pytorch":
+            return SingingScoreResult(score=None, model_name=self.model_name, decision="requires_audio")
 
         vector = [vectorize_features(features, self.feature_names)]
         score = self._predict_probability(vector)
@@ -118,6 +167,15 @@ class SingingCandidateScorer:
             return SingingScoreResult(score=None, model_name="none", decision="disabled")
         if self.model is None:
             return SingingScoreResult(score=None, model_name=self.model_name, decision="unavailable")
+
+        if self.backend == "pytorch":
+            try:
+                score = float(self.model.score_candidate(audio_path, start_sec, end_sec))
+            except Exception as exc:
+                self.logger.warning("Singing PyTorch scoring failed for %.3f -> %.3f: %s", start_sec, end_sec, exc)
+                return SingingScoreResult(score=None, model_name=self.model_name, decision="feature_error")
+            decision = "pass" if score >= self.threshold else "below_threshold"
+            return SingingScoreResult(score=score, model_name=self.model_name, decision=decision)
 
         try:
             features = extract_candidate_features(

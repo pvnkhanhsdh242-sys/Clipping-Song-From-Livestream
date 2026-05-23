@@ -8,5 +8,7 @@ __pycache__
 *.pyd
 *.log
 output
+data/models
+data/training_clips
 .cache
 secret/token.json
