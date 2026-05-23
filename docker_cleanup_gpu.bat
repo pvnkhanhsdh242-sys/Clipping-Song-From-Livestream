@@ -3,10 +3,14 @@ setlocal
 
 set "COMPOSE_FILE=docker-compose.gpu.yml"
 set "DEEP_CLEAN=0"
+set "PURGE_PROJECT_IMAGE=0"
 set "DOCKER_DESKTOP_EXE=%ProgramFiles%\Docker\Docker\Docker Desktop.exe"
 if not exist "%DOCKER_DESKTOP_EXE%" set "DOCKER_DESKTOP_EXE=%LocalAppData%\Programs\Docker\Docker\Docker Desktop.exe"
 
-if /I "%~1"=="--deep" set "DEEP_CLEAN=1"
+for %%A in (%*) do (
+    if /I "%%~A"=="--deep" set "DEEP_CLEAN=1"
+    if /I "%%~A"=="--purge-project-image" set "PURGE_PROJECT_IMAGE=1"
+)
 
 call :ensure_docker_engine
 if errorlevel 1 exit /b 1
@@ -18,8 +22,16 @@ if errorlevel 1 (
     exit /b 1
 )
 
-echo [2/4] Removing known GPU images (current + legacy names)...
-for %%I in ("karaoke-clipper:gpu" "random_project-karaoke-clipper-gpu" "random_project-karaoke-clipper-streamlit-gpu") do (
+echo [2/4] Removing unsupported/legacy GPU images (keeping supported runtime images)...
+for %%I in (
+    "random_project-karaoke-clipper-gpu"
+    "random_project-karaoke-clipper-streamlit-gpu"
+    "pytorch/pytorch:2.5.1-cuda12.1-cudnn9-runtime"
+    "pytorch/pytorch:2.5.1-cuda12.4-cudnn9-runtime"
+    "pytorch/pytorch:2.3.1-cuda12.1-cudnn8-runtime"
+    "nvidia/cuda:12.4.1-cudnn-runtime-ubuntu22.04"
+    "nvidia/cuda:12.1.1-cudnn8-runtime-ubuntu22.04"
+) do (
     docker image inspect "%%~I" >nul 2>&1
     if not errorlevel 1 (
         echo Removing image %%~I
@@ -27,6 +39,19 @@ for %%I in ("karaoke-clipper:gpu" "random_project-karaoke-clipper-gpu" "random_p
     ) else (
         echo Image not found: %%~I
     )
+)
+
+if "%PURGE_PROJECT_IMAGE%"=="1" (
+    echo Optional purge: removing project runtime image karaoke-clipper:gpu
+    docker image inspect "karaoke-clipper:gpu" >nul 2>&1
+    if not errorlevel 1 (
+        docker image rm -f "karaoke-clipper:gpu" >nul 2>&1
+    ) else (
+        echo Image not found: karaoke-clipper:gpu
+    )
+) else (
+    echo Keeping supported images: karaoke-clipper:gpu and pytorch/pytorch:2.4.1-cuda12.1-cudnn9-runtime
+    echo Tip: add --purge-project-image if you want to remove karaoke-clipper:gpu too.
 )
 
 echo [3/4] Pruning dangling layers...

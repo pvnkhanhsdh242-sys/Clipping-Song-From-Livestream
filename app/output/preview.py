@@ -25,6 +25,9 @@ class PreviewRecord:
     boundary_method: str
     refinement_method: str
     music_ratio: float
+    singing_score: float | None = None
+    singing_model: str = "none"
+    singing_decision: str = "not_scored"
 
     def to_row(self) -> Dict[str, object]:
         return {
@@ -43,6 +46,9 @@ class PreviewRecord:
             "boundary_method": self.boundary_method,
             "refinement_method": self.refinement_method,
             "music_ratio": round(self.music_ratio, 4),
+            "singing_score": round(self.singing_score, 4) if self.singing_score is not None else None,
+            "singing_model": self.singing_model,
+            "singing_decision": self.singing_decision,
         }
 
 

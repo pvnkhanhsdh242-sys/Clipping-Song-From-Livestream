@@ -15,7 +15,9 @@ from dotenv import load_dotenv
 CLIP_RESOLUTION_CHOICES = ["source", "1080p", "720p", "480p", "360p"]
 WHISPERX_BOUNDARY_MODES = ["off", "metadata", "safe"]
 PROFILE_CHOICES = ["karaoke", "concert", "mixed_stream", "strict", "custom"]
+SINGING_MODEL_MODES = ["off", "score", "filter"]
 RUNTIME_DEVICE_ENV = "KARAOKE_FORCE_DEVICE"
+DEFAULT_SINGING_MODEL_DIR = Path("data/models/singing_candidate")
 
 PROFILES: dict[str, dict[str, float | str]] = {
     "karaoke": {
@@ -68,6 +70,15 @@ def resolve_runtime_device(preferred_device: str) -> str:
     return preferred_device
 
 
+def resolve_default_singing_model(project_root: Path | None = None) -> tuple[Path | None, str]:
+    """Return the default singing model path and mode when a trained artifact exists."""
+    root = project_root or Path.cwd()
+    candidate = (root / DEFAULT_SINGING_MODEL_DIR).expanduser().resolve()
+    if (candidate / "model.joblib").exists():
+        return candidate, "score"
+    return None, "off"
+
+
 def str_to_bool(value: str) -> bool:
     lowered = value.strip().lower()
     if lowered in {"1", "true", "t", "yes", "y", "on"}:
@@ -110,6 +121,10 @@ class AppConfig:
     energy_min_silence_ms: int
     profile: str
     review_score_threshold: float
+    music_ratio_threshold: float
+    singing_model_path: Optional[Path]
+    singing_score_threshold: float
+    singing_model_mode: str
     gdrive_upload: bool
     gdrive_folder_id: Optional[str]
     gdrive_client_secrets: Optional[Path]
@@ -254,6 +269,29 @@ def build_parser() -> argparse.ArgumentParser:
         help="Score below which clips are marked for review",
     )
     parser.add_argument(
+        "--music-ratio-threshold",
+        type=float,
+        default=0.0,
+        help="Drop segments with music_ratio below this value (0-1)",
+    )
+    parser.add_argument(
+        "--singing-model-path",
+        default=None,
+        help="Directory containing singing model.joblib/metadata.json, or a direct .joblib file",
+    )
+    parser.add_argument(
+        "--singing-score-threshold",
+        type=float,
+        default=0.5,
+        help="Minimum model score to treat a candidate as singing (0-1)",
+    )
+    parser.add_argument(
+        "--singing-model-mode",
+        choices=SINGING_MODEL_MODES,
+        default="off",
+        help="Singing model handling: off, score, or filter",
+    )
+    parser.add_argument(
         "--gdrive-upload",
         type=str_to_bool,
         default=False,
@@ -333,6 +371,12 @@ def load_config(argv: Optional[Sequence[str]] = None) -> AppConfig:
         if not _flag_present("--whisperx-boundary-mode"):
             args.whisperx_boundary_mode = str(profile["whisperx_boundary_mode"])
 
+    default_singing_model_path, default_singing_model_mode = resolve_default_singing_model()
+    if not _flag_present("--singing-model-path") and args.singing_model_path is None:
+        args.singing_model_path = str(default_singing_model_path) if default_singing_model_path else None
+    if not _flag_present("--singing-model-mode") and args.singing_model_mode == "off":
+        args.singing_model_mode = default_singing_model_mode
+
     if args.min_segment <= 0:
         parser.error("--min-segment must be > 0")
     if args.max_segment <= args.min_segment:
@@ -353,6 +397,10 @@ def load_config(argv: Optional[Sequence[str]] = None) -> AppConfig:
         parser.error("--energy-min-active-ms and --energy-min-silence-ms must be > 0")
     if args.review_score_threshold < 0 or args.review_score_threshold > 1:
         parser.error("--review-score-threshold must be between 0 and 1")
+    if args.music_ratio_threshold < 0 or args.music_ratio_threshold > 1:
+        parser.error("--music-ratio-threshold must be between 0 and 1")
+    if args.singing_score_threshold < 0 or args.singing_score_threshold > 1:
+        parser.error("--singing-score-threshold must be between 0 and 1")
     if args.exclude_end_seconds is not None and args.exclude_end_seconds < 0:
         parser.error("--exclude-end-seconds must be >= 0")
     if args.expected_song_count is not None and args.expected_song_count <= 0:
@@ -425,6 +473,10 @@ def load_config(argv: Optional[Sequence[str]] = None) -> AppConfig:
         energy_min_silence_ms=int(args.energy_min_silence_ms),
         profile=str(args.profile),
         review_score_threshold=float(args.review_score_threshold),
+        music_ratio_threshold=float(args.music_ratio_threshold),
+        singing_model_path=Path(args.singing_model_path).expanduser().resolve() if args.singing_model_path else None,
+        singing_score_threshold=float(args.singing_score_threshold),
+        singing_model_mode=str(args.singing_model_mode),
         gdrive_upload=bool(args.gdrive_upload),
         gdrive_folder_id=str(gdrive_folder_id).strip() if gdrive_folder_id else None,
         gdrive_client_secrets=(

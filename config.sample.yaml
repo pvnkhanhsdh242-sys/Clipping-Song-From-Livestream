@@ -26,6 +26,10 @@ pipeline:
   energy_min_active_ms: 500
   energy_min_silence_ms: 1200
   review_score_threshold: 0.65
+  music_ratio_threshold: 0.0
+  singing_model_mode: off
+  singing_model_path: null
+  singing_score_threshold: 0.5
   gdrive_upload: false
   gdrive_upload_mode: clips
   gdrive_folder_id: null

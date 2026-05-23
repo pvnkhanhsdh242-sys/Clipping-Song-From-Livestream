@@ -18,7 +18,9 @@ from app.config import (
     PROFILE_CHOICES,
     PROFILES,
     RUNTIME_DEVICE_ENV,
+    SINGING_MODEL_MODES,
     WHISPERX_BOUNDARY_MODES,
+    resolve_default_singing_model,
     resolve_runtime_device,
 )
 from app.integrations.gdrive import find_client_secrets_path
@@ -58,6 +60,10 @@ def _build_config(
     energy_min_active_ms: int,
     energy_min_silence_ms: int,
     review_score_threshold: float,
+    music_ratio_threshold: float,
+    singing_model_path: str,
+    singing_score_threshold: float,
+    singing_model_mode: str,
     gdrive_upload: bool,
     gdrive_folder_id: str,
     gdrive_client_secrets: str,
@@ -68,15 +74,6 @@ def _build_config(
     url = url_value.strip() if source_mode == "YouTube URL" else None
     file_path = file_value.strip() if source_mode == "Local file" else None
 
-    profile_values = PROFILES.get(profile, {}) if profile != "custom" else {}
-    effective_min_segment = float(profile_values.get("min_segment", min_segment))
-    effective_max_segment = float(profile_values.get("max_segment", max_segment))
-    effective_merge_gap = float(profile_values.get("merge_gap", merge_gap))
-    effective_bridge_noise_gap = float(profile_values.get("bridge_noise_gap", bridge_noise_gap_sec))
-    effective_bridge_speech_gap = float(profile_values.get("bridge_speech_gap", bridge_speech_gap_sec))
-    effective_pre_roll = float(profile_values.get("pre_roll", pre_roll_sec))
-    effective_post_roll = float(profile_values.get("post_roll", post_roll_sec))
-    effective_whisperx_mode = str(profile_values.get("whisperx_boundary_mode", whisperx_boundary_mode))
     effective_device = resolve_runtime_device(device)
 
     return AppConfig(
@@ -84,19 +81,19 @@ def _build_config(
         file=Path(file_path).expanduser().resolve() if file_path else None,
         outdir=Path(outdir_value).expanduser().resolve(),
         audio_clips=audio_clips,
-        min_segment=effective_min_segment,
-        max_segment=float(effective_max_segment),
-        merge_max_segment=float(effective_max_segment),
+        min_segment=float(min_segment),
+        max_segment=float(max_segment),
+        merge_max_segment=float(max_segment),
         segment_tolerance=float(segment_tolerance),
-        pre_roll_sec=effective_pre_roll,
-        post_roll_sec=effective_post_roll,
-        bridge_noise_gap_sec=effective_bridge_noise_gap,
-        bridge_speech_gap_sec=effective_bridge_speech_gap,
+        pre_roll_sec=float(pre_roll_sec),
+        post_roll_sec=float(post_roll_sec),
+        bridge_noise_gap_sec=float(bridge_noise_gap_sec),
+        bridge_speech_gap_sec=float(bridge_speech_gap_sec),
         use_acoustid=use_acoustid,
         ref_library=Path(ref_library).expanduser().resolve() if ref_library else None,
         device=effective_device,
         sample_rate=int(sample_rate),
-        merge_gap=float(effective_merge_gap),
+        merge_gap=float(merge_gap),
         exclude_start_seconds=float(exclude_start_seconds),
         exclude_end_seconds=float(exclude_end_seconds),
         expected_song_count=expected_song_count,
@@ -104,7 +101,7 @@ def _build_config(
         clip_resolution=clip_resolution,
         fingerprint_threshold=float(fingerprint_threshold),
         acoustid_api_key=os.getenv("ACOUSTID_API_KEY"),
-        whisperx_boundary_mode=effective_whisperx_mode,
+        whisperx_boundary_mode=str(whisperx_boundary_mode),
         whisperx_max_start_shrink_sec=float(whisperx_max_start_shrink),
         whisperx_max_end_shrink_sec=float(whisperx_max_end_shrink),
         allow_hard_split=bool(allow_hard_split),
@@ -113,6 +110,10 @@ def _build_config(
         energy_min_silence_ms=int(energy_min_silence_ms),
         profile=str(profile),
         review_score_threshold=float(review_score_threshold),
+        music_ratio_threshold=float(music_ratio_threshold),
+        singing_model_path=Path(singing_model_path).expanduser().resolve() if singing_model_path else None,
+        singing_score_threshold=float(singing_score_threshold),
+        singing_model_mode=str(singing_model_mode),
         gdrive_upload=gdrive_upload,
         gdrive_folder_id=(gdrive_folder_id or "").strip() or os.getenv("GDRIVE_FOLDER_ID"),
         gdrive_client_secrets=(
@@ -145,14 +146,17 @@ st.caption("Preview segments and run the clipper with optional Google Drive uplo
 forced_device_value = os.getenv(RUNTIME_DEVICE_ENV, "").strip().lower()
 device_is_forced = forced_device_value in {"cpu", "cuda"}
 default_device = forced_device_value if device_is_forced else "cpu"
+default_singing_model_path, default_singing_model_mode = resolve_default_singing_model(PROJECT_ROOT)
 if device_is_forced:
     st.info(f"Runtime device is forced to '{forced_device_value}' by container healthcheck.")
+if default_singing_model_path is not None:
+    st.info(f"Loaded default singing model: {default_singing_model_path}")
 
 source_mode = st.radio("Source", ["YouTube URL", "Local file"], horizontal=True)
 profile = st.selectbox("Profile", PROFILE_CHOICES, index=0)
 profile_defaults = PROFILES.get(profile, {}) if profile != "custom" else {}
 if profile != "custom":
-    st.info("Profile overrides segment tuning values unless you switch to 'custom'.")
+    st.info("Profile sets initial defaults. You can still tune values below.")
 
 if source_mode == "YouTube URL":
     url_value = st.text_input("YouTube URL", value="")
@@ -224,7 +228,9 @@ with col2:
     clip_resolution = st.selectbox("Clip resolution", CLIP_RESOLUTION_CHOICES, index=0)
     audio_clips = st.checkbox("Export WAV clips", value=False)
     use_acoustid = st.checkbox("Use AcoustID lookup", value=False)
-    whisperx_boundary_mode = st.selectbox("WhisperX boundary mode", WHISPERX_BOUNDARY_MODES, index=2)
+    default_whisper_mode = str(profile_defaults.get("whisperx_boundary_mode", "safe"))
+    default_whisper_index = WHISPERX_BOUNDARY_MODES.index(default_whisper_mode) if default_whisper_mode in WHISPERX_BOUNDARY_MODES else 2
+    whisperx_boundary_mode = st.selectbox("WhisperX boundary mode", WHISPERX_BOUNDARY_MODES, index=default_whisper_index)
     whisperx_max_start_shrink = st.number_input(
         "WhisperX max start shrink (sec)",
         min_value=0.0,
@@ -254,6 +260,31 @@ with col3:
         min_value=0.0,
         max_value=1.0,
         value=0.65,
+        step=0.01,
+    )
+    music_ratio_threshold = st.number_input(
+        "Music ratio threshold",
+        min_value=0.0,
+        max_value=1.0,
+        value=0.0,
+        step=0.01,
+        help="Filter out segments whose music_ratio is lower than this value.",
+    )
+    default_singing_mode_index = (
+        SINGING_MODEL_MODES.index(default_singing_model_mode)
+        if default_singing_model_mode in SINGING_MODEL_MODES
+        else 0
+    )
+    singing_model_mode = st.selectbox("Singing model mode", SINGING_MODEL_MODES, index=default_singing_mode_index)
+    singing_model_path = st.text_input(
+        "Singing model path",
+        value=str(default_singing_model_path) if default_singing_model_path else "",
+    )
+    singing_score_threshold = st.number_input(
+        "Singing score threshold",
+        min_value=0.0,
+        max_value=1.0,
+        value=0.5,
         step=0.01,
     )
     energy_frame_ms = st.number_input("Energy frame (ms)", min_value=10, value=100, step=10)
@@ -346,6 +377,10 @@ if preview_clicked:
             energy_min_active_ms=energy_min_active_ms,
             energy_min_silence_ms=energy_min_silence_ms,
             review_score_threshold=review_score_threshold,
+            music_ratio_threshold=music_ratio_threshold,
+            singing_model_path=singing_model_path,
+            singing_score_threshold=singing_score_threshold,
+            singing_model_mode=singing_model_mode,
             gdrive_upload=False,
             gdrive_folder_id=_extract_drive_folder_id(gdrive_folder_id),
             gdrive_client_secrets=gdrive_client_secrets,
@@ -491,6 +526,10 @@ if st.session_state.get("is_processing") and st.session_state.get("preview_recor
                 energy_min_active_ms=energy_min_active_ms,
                 energy_min_silence_ms=energy_min_silence_ms,
                 review_score_threshold=review_score_threshold,
+                music_ratio_threshold=music_ratio_threshold,
+                singing_model_path=singing_model_path,
+                singing_score_threshold=singing_score_threshold,
+                singing_model_mode=singing_model_mode,
                 gdrive_upload=gdrive_upload_effective,
                 gdrive_folder_id=_extract_drive_folder_id(gdrive_folder_id_value),
                 gdrive_client_secrets=gdrive_client_secrets,

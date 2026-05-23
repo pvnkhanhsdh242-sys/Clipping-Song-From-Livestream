@@ -67,12 +67,12 @@ docker-healthcheck-gpu:
 
 docker-clean-gpu:
 	docker compose -f docker-compose.gpu.yml down --remove-orphans
-	-docker image rm -f karaoke-clipper:gpu random_project-karaoke-clipper-gpu random_project-karaoke-clipper-streamlit-gpu
+	-docker image rm -f random_project-karaoke-clipper-gpu random_project-karaoke-clipper-streamlit-gpu pytorch/pytorch:2.5.1-cuda12.1-cudnn9-runtime pytorch/pytorch:2.5.1-cuda12.4-cudnn9-runtime pytorch/pytorch:2.3.1-cuda12.1-cudnn8-runtime nvidia/cuda:12.4.1-cudnn-runtime-ubuntu22.04 nvidia/cuda:12.1.1-cudnn8-runtime-ubuntu22.04
 	docker image prune -f
 
 docker-reset-gpu:
 	docker compose -f docker-compose.gpu.yml down --remove-orphans
-	-docker image rm -f karaoke-clipper:gpu random_project-karaoke-clipper-gpu random_project-karaoke-clipper-streamlit-gpu
+	-docker image rm -f random_project-karaoke-clipper-gpu random_project-karaoke-clipper-streamlit-gpu pytorch/pytorch:2.5.1-cuda12.1-cudnn9-runtime pytorch/pytorch:2.5.1-cuda12.4-cudnn9-runtime pytorch/pytorch:2.3.1-cuda12.1-cudnn8-runtime nvidia/cuda:12.4.1-cudnn-runtime-ubuntu22.04 nvidia/cuda:12.1.1-cudnn8-runtime-ubuntu22.04
 	docker image prune -f
 	docker compose -f docker-compose.gpu.yml build karaoke-clipper-streamlit-gpu
 	docker compose -f docker-compose.gpu.yml up karaoke-clipper-streamlit-gpu

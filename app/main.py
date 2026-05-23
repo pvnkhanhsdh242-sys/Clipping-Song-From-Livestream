@@ -23,6 +23,7 @@ from app.output.manifest import ManifestRecord, write_manifests
 from app.output.preview import PreviewRecord, generate_snapshots
 from app.preprocess.extract_audio import extract_working_audio
 from app.segment.music_segments import calculate_music_ratio, detect_music_segments
+from app.singing.scorer import SingingCandidateScorer
 from app.utils.ffmpeg import ensure_ffmpeg_available
 from app.utils.logging import setup_logger
 from app.utils.paths import prepare_output_dirs
@@ -51,6 +52,9 @@ class SegmentAnalysis:
     bridged_gap_total_sec: float
     needs_review: bool
     review_reason: str | None
+    singing_score: float | None = None
+    singing_model: str = "none"
+    singing_decision: str = "not_scored"
 
     def to_preview(self) -> PreviewRecord:
         return PreviewRecord(
@@ -67,6 +71,9 @@ class SegmentAnalysis:
             boundary_method=self.boundary_method,
             refinement_method=self.refinement_method,
             music_ratio=self.music_ratio,
+            singing_score=self.singing_score,
+            singing_model=self.singing_model,
+            singing_decision=self.singing_decision,
         )
 
 
@@ -133,6 +140,9 @@ def _split_oversized_analyses(
                     bridged_gap_total_sec=analysis.bridged_gap_total_sec,
                     needs_review=analysis.needs_review,
                     review_reason=analysis.review_reason,
+                    singing_score=analysis.singing_score,
+                    singing_model=analysis.singing_model,
+                    singing_decision=analysis.singing_decision,
                 )
             )
             next_index += 1
@@ -149,6 +159,81 @@ def _split_oversized_analyses(
             )
 
     return split
+
+
+def _filter_analyses_by_music_ratio(
+    analyses: list[SegmentAnalysis],
+    music_ratio_threshold: float,
+    logger,
+) -> list[SegmentAnalysis]:
+    if music_ratio_threshold <= 0:
+        return analyses
+
+    kept: list[SegmentAnalysis] = []
+    for analysis in analyses:
+        if analysis.music_ratio >= music_ratio_threshold:
+            kept.append(analysis)
+            continue
+
+        logger.info(
+            "Filtered segment %s by music ratio %.4f < %.4f (%.3f -> %.3f)",
+            analysis.index,
+            analysis.music_ratio,
+            music_ratio_threshold,
+            analysis.refined_start,
+            analysis.refined_end,
+        )
+
+    if len(kept) != len(analyses):
+        logger.info(
+            "Music-ratio filter kept %s/%s segments (threshold=%.3f)",
+            len(kept),
+            len(analyses),
+            music_ratio_threshold,
+        )
+
+    for idx, analysis in enumerate(kept, start=1):
+        analysis.index = idx
+
+    return kept
+
+
+def _filter_analyses_by_singing_score(
+    analyses: list[SegmentAnalysis],
+    singing_model_mode: str,
+    singing_score_threshold: float,
+    logger,
+) -> list[SegmentAnalysis]:
+    if singing_model_mode != "filter":
+        return analyses
+
+    kept: list[SegmentAnalysis] = []
+    for analysis in analyses:
+        if analysis.singing_score is None or analysis.singing_score >= singing_score_threshold:
+            kept.append(analysis)
+            continue
+
+        logger.info(
+            "Filtered segment %s by singing score %.4f < %.4f (%.3f -> %.3f)",
+            analysis.index,
+            analysis.singing_score,
+            singing_score_threshold,
+            analysis.refined_start,
+            analysis.refined_end,
+        )
+
+    if len(kept) != len(analyses):
+        logger.info(
+            "Singing-score filter kept %s/%s segments (threshold=%.3f)",
+            len(kept),
+            len(analyses),
+            singing_score_threshold,
+        )
+
+    for idx, analysis in enumerate(kept, start=1):
+        analysis.index = idx
+
+    return kept
 
 
 def _resolve_source(config: AppConfig, vods_dir: Path, logger) -> SourceVideo:
@@ -185,6 +270,7 @@ def _analyze_segments(
     matcher: ChromaprintMatcher,
     acoustid: AcoustIDClient,
     refiner: WhisperXRefiner,
+    singing_scorer: SingingCandidateScorer,
     config: AppConfig,
     logger,
 ) -> list[SegmentAnalysis]:
@@ -248,12 +334,35 @@ def _analyze_segments(
             boundary_quality_score -= 0.3
         boundary_quality_score = max(0.0, min(1.0, boundary_quality_score))
 
-        final_score = (
-            0.40 * music_ratio
-            + 0.35 * fingerprint_confidence
-            + 0.15 * duration_score
-            + 0.10 * boundary_quality_score
+        singing_result = singing_scorer.score_candidate(
+            working_audio,
+            refined_start,
+            refined_end,
+            music_ratio=music_ratio,
+            fingerprint_confidence=fingerprint_confidence,
+            duration_score=duration_score,
+            boundary_quality_score=boundary_quality_score,
+            merge_count=segment.merge_count,
+            bridged_gap_total_sec=segment.bridged_gap_total_sec,
+            boundary_method=segment.boundary_method,
         )
+        singing_score = singing_result.score
+
+        if singing_score is None:
+            final_score = (
+                0.40 * music_ratio
+                + 0.35 * fingerprint_confidence
+                + 0.15 * duration_score
+                + 0.10 * boundary_quality_score
+            )
+        else:
+            final_score = (
+                0.30 * music_ratio
+                + 0.25 * fingerprint_confidence
+                + 0.20 * singing_score
+                + 0.15 * duration_score
+                + 0.10 * boundary_quality_score
+            )
 
         needs_review = bool(segment.needs_review)
         review_reason = segment.review_reason
@@ -266,6 +375,9 @@ def _analyze_segments(
         if refined_end - refined_start > config.max_segment and not config.allow_hard_split:
             needs_review = True
             review_reason = review_reason or "segment_exceeds_max_duration"
+        if singing_score is not None and singing_score < config.singing_score_threshold:
+            needs_review = True
+            review_reason = review_reason or "low_singing_score"
         if final_score < config.review_score_threshold:
             needs_review = True
             review_reason = review_reason or "low_score"
@@ -292,6 +404,9 @@ def _analyze_segments(
                 bridged_gap_total_sec=float(segment.bridged_gap_total_sec),
                 needs_review=needs_review,
                 review_reason=review_reason,
+                singing_score=float(singing_score) if singing_score is not None else None,
+                singing_model=singing_result.model_name,
+                singing_decision=singing_result.decision,
             )
         )
 
@@ -385,20 +500,33 @@ def run_pipeline(
     matcher = ChromaprintMatcher(config.ref_library, config.fingerprint_threshold, logger)
     acoustid = AcoustIDClient(config.acoustid_api_key, config.use_acoustid, logger)
     refiner = WhisperXRefiner(device=config.device, logger=logger)
+    singing_scorer = SingingCandidateScorer.from_config(config, logger)
 
-    analyses = _analyze_segments(
-        segmentation.segments,
-        segmentation.raw_segments,
-        segmentation.audio_duration_sec,
-        working_audio,
-        output_dirs,
-        matcher,
-        acoustid,
-        refiner,
-        config,
+    try:
+        analyses = _analyze_segments(
+            segmentation.segments,
+            segmentation.raw_segments,
+            segmentation.audio_duration_sec,
+            working_audio,
+            output_dirs,
+            matcher,
+            acoustid,
+            refiner,
+            singing_scorer,
+            config,
+            logger,
+        )
+    finally:
+        refiner.release()
+
+    analyses = _split_oversized_analyses(analyses, config.max_segment, config.allow_hard_split, logger)
+    analyses = _filter_analyses_by_music_ratio(analyses, config.music_ratio_threshold, logger)
+    analyses = _filter_analyses_by_singing_score(
+        analyses,
+        config.singing_model_mode,
+        config.singing_score_threshold,
         logger,
     )
-    analyses = _split_oversized_analyses(analyses, config.max_segment, config.allow_hard_split, logger)
     records: list[ManifestRecord] = []
 
     total_clips = len(analyses)
@@ -465,6 +593,9 @@ def run_pipeline(
                 clip_path=str(clip.clip_path),
                 audio_path=str(clip.audio_path) if clip.audio_path else None,
                 backend=analysis.match.backend if analysis.match else "none",
+                singing_score=round(analysis.singing_score, 4) if analysis.singing_score is not None else None,
+                singing_model=analysis.singing_model,
+                singing_decision=analysis.singing_decision,
             )
         )
 
@@ -517,20 +648,33 @@ def preview_pipeline(config: AppConfig, snapshot_limit: int = 0) -> PreviewResul
     matcher = ChromaprintMatcher(config.ref_library, config.fingerprint_threshold, logger)
     acoustid = AcoustIDClient(config.acoustid_api_key, config.use_acoustid, logger)
     refiner = WhisperXRefiner(device=config.device, logger=logger)
+    singing_scorer = SingingCandidateScorer.from_config(config, logger)
 
-    analyses = _analyze_segments(
-        segmentation.segments,
-        segmentation.raw_segments,
-        segmentation.audio_duration_sec,
-        working_audio,
-        output_dirs,
-        matcher,
-        acoustid,
-        refiner,
-        config,
+    try:
+        analyses = _analyze_segments(
+            segmentation.segments,
+            segmentation.raw_segments,
+            segmentation.audio_duration_sec,
+            working_audio,
+            output_dirs,
+            matcher,
+            acoustid,
+            refiner,
+            singing_scorer,
+            config,
+            logger,
+        )
+    finally:
+        refiner.release()
+
+    analyses = _split_oversized_analyses(analyses, config.max_segment, config.allow_hard_split, logger)
+    analyses = _filter_analyses_by_music_ratio(analyses, config.music_ratio_threshold, logger)
+    analyses = _filter_analyses_by_singing_score(
+        analyses,
+        config.singing_model_mode,
+        config.singing_score_threshold,
         logger,
     )
-    analyses = _split_oversized_analyses(analyses, config.max_segment, config.allow_hard_split, logger)
     preview_records = [analysis.to_preview() for analysis in analyses]
     logger.info("Preview generated %s candidate segments", len(preview_records))
 

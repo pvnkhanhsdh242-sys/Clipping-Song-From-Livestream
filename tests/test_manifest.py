@@ -43,3 +43,5 @@ def test_write_manifests(tmp_path: Path):
     json_text = json_path.read_text(encoding="utf-8")
     assert "start_tc" in json_text
     assert "backend" in json_text
+    assert "singing_score" in json_text
+    assert "label_singing" in json_text

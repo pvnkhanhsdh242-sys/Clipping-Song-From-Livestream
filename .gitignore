@@ -26,4 +26,7 @@ secret/token.json
 
 # Local generated data
 data/reference_library.json
+data/models/
+data/training_clips/
 secret/
+.cache/

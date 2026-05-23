@@ -1,6 +1,6 @@
 @echo off
 setlocal
-set "DOCKER_GPU_PLATFORM=linux/amd64"
+       set "DOCKER_GPU_PLATFORM=linux/amd64"
 set "DOCKER_DESKTOP_EXE=%ProgramFiles%\Docker\Docker\Docker Desktop.exe"
 if not exist "%DOCKER_DESKTOP_EXE%" set "DOCKER_DESKTOP_EXE=%LocalAppData%\Programs\Docker\Docker\Docker Desktop.exe"
 

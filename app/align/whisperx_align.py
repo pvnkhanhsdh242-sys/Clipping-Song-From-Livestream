@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import gc
 import logging
 import wave
 from array import array
@@ -101,6 +102,29 @@ class WhisperXRefiner:
         except Exception as exc:  # pragma: no cover - optional dependency path
             self._disabled = True
             self.logger.warning("WhisperX not available; refinement fallback to coarse boundaries: %s", exc)
+
+    def release(self) -> None:
+        model = self._model
+        self._model = None
+        if model is None:
+            return
+
+        try:
+            del model
+            gc.collect()
+
+            if self.device != "cuda":
+                return
+
+            import torch  # type: ignore
+
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
+                if hasattr(torch.cuda, "ipc_collect"):
+                    torch.cuda.ipc_collect()
+            self.logger.info("Released WhisperX model and CUDA cache")
+        except Exception as exc:  # pragma: no cover - optional dependency path
+            self.logger.debug("WhisperX cleanup skipped: %s", exc)
 
     def refine_segment(
         self,

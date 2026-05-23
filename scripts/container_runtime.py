@@ -6,7 +6,6 @@ import argparse
 import json
 import os
 import shlex
-import subprocess
 import sys
 from typing import Any, Sequence
 
@@ -97,6 +96,24 @@ def _build_runtime_env(probe: dict[str, Any]) -> dict[str, str]:
     return env
 
 
+def _release_probe_cuda_cache(probe: dict[str, Any]) -> None:
+    if not probe.get("torch_available"):
+        return
+
+    try:
+        import gc
+        import torch  # type: ignore
+
+        if probe.get("cuda_available") and torch.cuda.is_available():
+            torch.cuda.empty_cache()
+            if hasattr(torch.cuda, "ipc_collect"):
+                torch.cuda.ipc_collect()
+        gc.collect()
+    except Exception:
+        # Best-effort cleanup only.
+        return
+
+
 def _run_command(command: list[str], probe: dict[str, Any], require_cuda: bool) -> int:
     _print_health_summary(probe)
     if require_cuda and probe["device"] != "cuda":
@@ -105,7 +122,21 @@ def _run_command(command: list[str], probe: dict[str, Any], require_cuda: bool) 
 
     rendered = " ".join(shlex.quote(part) for part in command)
     print(f"[container-runtime] launching={rendered}")
-    return subprocess.call(command, env=_build_runtime_env(probe))
+
+    # Replace this process with the target app so probe-related CUDA allocations
+    # do not remain resident while Streamlit/pipeline is idle.
+    env = _build_runtime_env(probe)
+    _release_probe_cuda_cache(probe)
+    try:
+        sys.stdout.flush()
+        sys.stderr.flush()
+        os.execvpe(command[0], command, env)
+    except FileNotFoundError:
+        print(f"[container-runtime] command not found: {command[0]}", file=sys.stderr)
+        return 127
+    except Exception as exc:
+        print(f"[container-runtime] failed to launch command: {exc}", file=sys.stderr)
+        return 1
 
 
 def _streamlit_command(address: str, port: int) -> list[str]:
@@ -189,6 +220,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             print(json.dumps(probe, ensure_ascii=True))
         else:
             _print_health_summary(probe)
+        _release_probe_cuda_cache(probe)
         if args.require_cuda and probe["device"] != "cuda":
             return 1
         return 0

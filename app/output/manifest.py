@@ -39,6 +39,12 @@ class ManifestRecord:
     clip_path: str
     backend: str
     audio_path: Optional[str] = None
+    singing_score: Optional[float] = None
+    singing_model: str = "none"
+    singing_decision: str = "not_scored"
+    label_singing: Optional[str] = None
+    label_quality: Optional[str] = None
+    label_notes: Optional[str] = None
 
     def to_serializable(self) -> dict:
         data = asdict(self)
@@ -89,6 +95,12 @@ def write_manifests(records: Iterable[ManifestRecord], output_path_base: Path) -
         "clip_path",
         "audio_path",
         "backend",
+        "singing_score",
+        "singing_model",
+        "singing_decision",
+        "label_singing",
+        "label_quality",
+        "label_notes",
     ]
 
     with csv_path.open("w", encoding="utf-8", newline="") as fh:

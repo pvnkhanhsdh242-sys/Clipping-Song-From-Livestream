@@ -51,6 +51,7 @@ The project is designed to be **API-free first**: local Chromaprint matching can
 | Identification | Matches candidate segments against a local Chromaprint reference library. |
 | Optional lookup | Uses AcoustID only when enabled and configured. |
 | Boundary refinement | Uses WhisperX when installed; otherwise keeps coarse boundaries. |
+| Trainable scoring | Optionally scores candidates with a reviewed-manifest singing model. |
 | Export | Writes MP4 clips, optional WAV clips, `manifest.json`, `manifest.csv`, logs, and review assets. |
 | UI | Provides a local Streamlit control panel for parameter entry and timestamp preview. |
 
@@ -68,7 +69,8 @@ Default flow:
 4. Match segments using a local Chromaprint library.
 5. Optionally call AcoustID when enabled and available.
 6. Refine boundaries with WhisperX when installed.
-7. Cut clips with FFmpeg and write manifests.
+7. Optionally score candidates with a trained singing model.
+8. Cut clips with FFmpeg and write manifests.
 
 ## Quick start
 
@@ -115,6 +117,28 @@ Supported filename convention:
 ```text
 Artist - Song.wav
 ```
+
+### 5. Optional: train a singing candidate scorer
+
+Run the pipeline once, review the generated manifest CSV, and fill `label_singing` with `1` for singing clips and `0` for non-singing clips. Then train:
+
+```bash
+python scripts/train_singing_candidate_model.py \
+  --manifest output/<run>/manifests/<video_id>_manifest.csv \
+  --output-dir data/models/singing_candidate \
+  --epochs 1000
+```
+
+Rerun with model scoring:
+
+```bash
+python -m app.main \
+  --file "C:/videos/sample.mp4" \
+  --singing-model-mode score \
+  --singing-model-path data/models/singing_candidate
+```
+
+Use `--singing-model-mode filter` to drop candidates below `--singing-score-threshold`.
 
 ## Run examples
 
@@ -240,7 +264,11 @@ Notes:
 | `--energy-min-active-ms <ms>` | Minimum active energy duration to start a segment. |
 | `--energy-min-silence-ms <ms>` | Minimum silence duration to stop a segment. |
 | `--review-score-threshold <0-1>` | Score below which clips are marked for review. |
+| `--music-ratio-threshold <0-1>` | Drop segments with `music_ratio` below this value. |
 | `--fingerprint-threshold <0-1>` | Local matching confidence threshold. |
+| `--singing-model-mode off\|score\|filter` | Disable model scoring, score only, or filter low-score candidates. |
+| `--singing-model-path <path>` | Directory with `model.joblib` and `metadata.json`, or direct `.joblib` path. |
+| `--singing-score-threshold <0-1>` | Threshold used for singing review/filter decisions. |
 | `--gdrive-upload true\|false` | Enable Google Drive upload. |
 | `--gdrive-folder-id <id>` | Target Drive folder ID or URL. |
 | `--gdrive-client-secrets <path>` | OAuth client secrets path. |
@@ -257,6 +285,8 @@ Additional behavior:
 - If `--merge-max-segment` differs from `--max-segment`, the merge max overrides max for merging and splitting.
 - Default profile `karaoke` applies stronger song-style defaults (use `--profile custom` to disable).
 - WhisperX `safe` mode limits how much boundaries can shrink from the padded clip.
+- `--music-ratio-threshold` applies a hard filter in preview and full run; segments below threshold are skipped.
+- Singing model `score` mode keeps all candidates and marks low scores for review; `filter` mode skips low-score candidates.
 - Google Drive upload uses OAuth user login and stores a token at `secret/token.json` by default.
 
 ## Output layout
@@ -291,6 +321,10 @@ Manifest fields include:
 | `clip_path` | Exported MP4 clip path. |
 | `audio_path` | Optional WAV clip path. |
 | `backend` | Identification backend used. |
+| `singing_score` | Optional trained model probability that the candidate contains singing. |
+| `singing_model` | Model artifact type/name used for scoring. |
+| `singing_decision` | Model decision such as `pass`, `below_threshold`, or `disabled`. |
+| `label_singing` | Manual review label for training: `1` singing, `0` not singing. |
 
 ## Repository layout
 
@@ -303,11 +337,13 @@ app/
   segment/music_segments.py       # segmentation + merge logic
   identify/chromaprint_match.py   # local fingerprint matching
   identify/acoustid_client.py     # optional AcoustID backend
+  singing/                        # trainable candidate scoring
   align/whisperx_align.py         # timestamp refinement
   clip/cutter.py                  # clip export
   output/manifest.py              # manifest writers
 scripts/
   build_reference_library.py      # build local fingerprint index
+  train_singing_candidate_model.py # train reviewed-manifest singing scorer
   batch_run.py                    # batch processing entry point
 tests/                            # unit tests
 ```
@@ -381,7 +417,8 @@ Windows Streamlit shortcut behavior:
 - `docker_streamlit_gpu.bat` starts Streamlit without forcing a rebuild each time.
 - If image `karaoke-clipper:gpu` does not exist, it builds once then starts.
 - Use `docker_streamlit_gpu.bat --build` to force rebuild.
-- Use `docker_cleanup_gpu.bat` to remove current + legacy GPU image names and dangling layers.
+- Use `docker_cleanup_gpu.bat` to remove unsupported/legacy GPU images and dangling layers while keeping the supported runtime pair (`karaoke-clipper:gpu` + `pytorch/pytorch:2.4.1-cuda12.1-cudnn9-runtime`).
+- Use `docker_cleanup_gpu.bat --purge-project-image` if you also want to remove `karaoke-clipper:gpu`.
 - Use `docker_reset_streamlit_gpu.bat` to cleanup, rebuild, and relaunch Streamlit in one command.
 - Use `docker_cleanup_gpu.bat --deep` to also remove Docker build cache and unused volumes when storage does not drop after image removal.
 - You can also run `docker_reset_streamlit_gpu.bat --deep` for deep cleanup + rebuild + restart.
