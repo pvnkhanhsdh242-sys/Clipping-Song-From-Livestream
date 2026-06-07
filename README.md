@@ -134,7 +134,7 @@ python scripts/train_singing_candidate_model.py \
 To build training manifests from all active `output/*/clips` folders, auto-generate VOD-gap negatives when needed, and train the default sklearn model:
 
 ```powershell
-.\train_singing_model_all.bat
+.\scripts\windows\train_singing_model_all.bat
 ```
 
 The optional PyTorch backend trains a small log-spectrogram CNN. Native Windows uses CPU unless your local PyTorch install has CUDA enabled:
@@ -225,7 +225,7 @@ Run the local UI to enter parameters, preview timestamps, and launch the pipelin
 streamlit run app/ui/streamlit_app.py
 ```
 
-On Windows, use `run_streamlit_chrome.bat` if you want the app to open in Chrome instead of the system default browser.
+On Windows, use `app.bat`. It tries the Docker GPU Streamlit UI first, then falls back to a local CPU Streamlit UI if Docker or GPU startup fails. Use `app.bat --cpu` to force local CPU mode, `app.bat --build` to rebuild the GPU image before startup, and `app.bat --dry-run` to print the launch plan without starting services.
 
 ## Google Drive upload
 
@@ -241,10 +241,23 @@ Notes:
 
 - The app accepts either a raw folder ID or a full Google Drive folder URL and extracts the folder ID.
 - By default, the pipeline uploads only the `clips/` folder to Drive.
+- When the full run uses Docker GPU from the local Streamlit UI, the app runs Google Drive upload from the host after GPU processing completes so OAuth browser login works normally.
+- If Google returns `invalid_grant`, the stale token cache is deleted and OAuth is started again.
 - To upload the entire run folder, use the Streamlit **Upload mode** control or the CLI flag:
 
 ```bash
 --gdrive-upload-mode all
+```
+
+Retry upload for an already exported run without rerunning clipping:
+
+```powershell
+.\.venv\Scripts\python.exe scripts\upload_gdrive_output.py `
+  --output-dir "output\your_run_folder" `
+  --parent-folder-id "https://drive.google.com/drive/folders/your_folder_id" `
+  --client-secrets "secret\client_secret.json" `
+  --token "secret\token.json" `
+  --mode clips
 ```
 
 ## CLI reference
@@ -417,9 +430,9 @@ make docker-healthcheck-gpu
 Build the dedicated training image and train the PyTorch singing backend:
 
 ```powershell
-.\docker_train_singing_gpu.bat --build
-.\docker_train_singing_gpu.bat
-.\docker_train_singing_gpu.bat --epochs 20 --batch-size 8 --window-sec 12
+.\scripts\windows\docker_train_singing_gpu.bat --build
+.\scripts\windows\docker_train_singing_gpu.bat
+.\scripts\windows\docker_train_singing_gpu.bat --epochs 20 --batch-size 8 --window-sec 12
 ```
 
 Equivalent make targets:
@@ -458,30 +471,35 @@ make docker-streamlit-gpu
 
 If `make` is unavailable on Windows, use:
 
-```bash
-docker_run_gpu.bat
-docker_train_singing_gpu.bat
-docker_healthcheck_gpu.bat
-docker_streamlit_gpu.bat
-docker_cleanup_gpu.bat
-docker_reset_streamlit_gpu.bat
+```powershell
+.\scripts\windows\docker_run_gpu.bat
+.\scripts\windows\docker_train_singing_gpu.bat
+.\scripts\windows\docker_healthcheck_gpu.bat
+.\scripts\windows\docker_streamlit_gpu.bat
+.\scripts\windows\docker_cleanup_gpu.bat
+.\scripts\windows\docker_reset_streamlit_gpu.bat
 ```
 
 Windows Streamlit shortcut behavior:
 
-- `docker_streamlit_gpu.bat` starts Streamlit without forcing a rebuild each time.
+- `app.bat` tries GPU Streamlit in detached Docker mode first and falls back to local CPU Streamlit if Docker/GPU startup fails.
+- `app.bat --cpu` or `app.bat --local` starts only the local CPU Streamlit UI.
+- `app.bat --gpu` or `app.bat --docker-ui` tries GPU Streamlit first and still falls back to CPU unless `--no-fallback` is passed.
+- `app.bat --dry-run` prints the selected launch plan without starting Streamlit or Docker.
+- `scripts\windows\docker_streamlit_gpu.bat` starts GPU Streamlit in detached mode and opens the browser.
 - If image `karaoke-clipper:gpu` does not exist, it builds once then starts.
-- Use `docker_streamlit_gpu.bat --build` to force rebuild.
-- Use `docker_cleanup_gpu.bat` to remove unsupported/legacy GPU images and dangling layers while keeping the supported runtime pair (`karaoke-clipper:gpu` + `pytorch/pytorch:2.4.1-cuda12.1-cudnn9-runtime`).
-- Use `docker_cleanup_gpu.bat --purge-project-image` if you also want to remove `karaoke-clipper:gpu`.
-- Use `docker_reset_streamlit_gpu.bat` to cleanup, rebuild, and relaunch Streamlit in one command.
-- Use `docker_cleanup_gpu.bat --deep` to also remove Docker build cache and unused volumes when storage does not drop after image removal.
-- You can also run `docker_reset_streamlit_gpu.bat --deep` for deep cleanup + rebuild + restart.
+- Use `scripts\windows\docker_streamlit_gpu.bat --build` to force rebuild.
+- Use `scripts\windows\docker_streamlit_gpu.bat --logs` to attach service logs after startup.
+- Use `scripts\windows\docker_cleanup_gpu.bat` to remove unsupported/legacy GPU images and dangling layers while keeping the supported runtime tags (`karaoke-clipper:gpu`, `karaoke-clipper:train-gpu`) and the PyTorch CUDA base.
+- Use `scripts\windows\docker_cleanup_gpu.bat --purge-project-image` if you also want to remove project GPU tags.
+- Use `scripts\windows\docker_reset_streamlit_gpu.bat` to cleanup, rebuild, and relaunch Streamlit in one command.
+- Use `scripts\windows\docker_cleanup_gpu.bat --deep` to also remove Docker build cache and unused volumes when storage does not drop after image removal.
+- You can also run `scripts\windows\docker_reset_streamlit_gpu.bat --deep` for deep cleanup + rebuild + restart.
 
 Cleanup and full rerun (single-shot):
 
-```bash
-docker_reset_streamlit_gpu.bat
+```powershell
+.\scripts\windows\docker_reset_streamlit_gpu.bat
 ```
 
 Make-based cleanup and rerun:
@@ -513,7 +531,7 @@ Notes:
 - If CUDA is visible, runtime is forced to `cuda`; otherwise it falls back to `cpu` automatically.
 - In Streamlit container mode, device selection is locked to the forced runtime device.
 - Singing CNN training uses GPU only for PyTorch model work. FFmpeg cutting and audio extraction still run on CPU.
-- After verifying the shared image, remove old dangling 26 GB project images with `docker image prune -f` or `docker_cleanup_gpu.bat --deep`.
+- After verifying the shared image, remove old dangling 26 GB project images with `docker image prune -f` or `scripts\windows\docker_cleanup_gpu.bat --deep`.
 
 ## Working status, fallbacks, and limitations
 

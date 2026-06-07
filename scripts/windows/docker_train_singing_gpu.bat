@@ -1,7 +1,7 @@
 @echo off
 setlocal EnableExtensions
 
-set "ROOT_DIR=%~dp0"
+for %%I in ("%~dp0..\..") do set "ROOT_DIR=%%~fI"
 set "DOCKER_GPU_PLATFORM=linux/amd64"
 set "DOCKER_DESKTOP_EXE=%ProgramFiles%\Docker\Docker\Docker Desktop.exe"
 if not exist "%DOCKER_DESKTOP_EXE%" set "DOCKER_DESKTOP_EXE=%LocalAppData%\Programs\Docker\Docker\Docker Desktop.exe"
@@ -30,7 +30,7 @@ call :ensure_docker_engine
 if errorlevel 1 exit /b 1
 
 if "%BUILD_IMAGE%"=="1" (
-  docker build --platform %DOCKER_GPU_PLATFORM% -f Dockerfile.gpu --target base-gpu -t %SHARED_IMAGE_TAG% -t %IMAGE_TAG% "%ROOT_DIR%."
+  docker build --platform %DOCKER_GPU_PLATFORM% -f "%ROOT_DIR%\Dockerfile.gpu" --target base-gpu -t %SHARED_IMAGE_TAG% -t %IMAGE_TAG% "%ROOT_DIR%"
   if errorlevel 1 (
     echo GPU training image build failed.
     exit /b 1
@@ -44,7 +44,7 @@ if "%BUILD_IMAGE%"=="1" (
 docker image inspect %IMAGE_TAG% >nul 2>&1
 if errorlevel 1 (
   echo Image %IMAGE_TAG% was not found. Building shared GPU image now...
-  docker build --platform %DOCKER_GPU_PLATFORM% -f Dockerfile.gpu --target base-gpu -t %SHARED_IMAGE_TAG% -t %IMAGE_TAG% "%ROOT_DIR%."
+  docker build --platform %DOCKER_GPU_PLATFORM% -f "%ROOT_DIR%\Dockerfile.gpu" --target base-gpu -t %SHARED_IMAGE_TAG% -t %IMAGE_TAG% "%ROOT_DIR%"
   if errorlevel 1 (
     echo GPU training image build failed.
     exit /b 1
@@ -53,10 +53,10 @@ if errorlevel 1 (
 
 docker run --rm --gpus all ^
   --platform %DOCKER_GPU_PLATFORM% ^
-  -v "%ROOT_DIR%output:/app/output" ^
-  -v "%ROOT_DIR%data:/app/data" ^
-  -v "%ROOT_DIR%secret:/app/secret" ^
-  -v "%ROOT_DIR%.cache:/app/.cache" ^
+  -v "%ROOT_DIR%\output:/app/output" ^
+  -v "%ROOT_DIR%\data:/app/data" ^
+  -v "%ROOT_DIR%\secret:/app/secret" ^
+  -v "%ROOT_DIR%\.cache:/app/.cache" ^
   %IMAGE_TAG% python scripts/container_runtime.py run --require-cuda -- python scripts/train_singing_model_all.py --backend pytorch --device cuda --epochs 5 %RUN_ARGS%
 
 if errorlevel 1 (

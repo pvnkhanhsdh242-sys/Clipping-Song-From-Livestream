@@ -1,7 +1,8 @@
 @echo off
 setlocal EnableExtensions
 
-cd /d "%~dp0"
+for %%I in ("%~dp0..\..") do set "ROOT_DIR=%%~fI"
+cd /d "%ROOT_DIR%"
 
 set "PY=.venv\Scripts\python.exe"
 if not exist "%PY%" set "PY=python"

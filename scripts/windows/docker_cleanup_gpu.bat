@@ -1,7 +1,8 @@
 @echo off
 setlocal
 
-set "COMPOSE_FILE=docker-compose.gpu.yml"
+for %%I in ("%~dp0..\..") do set "ROOT_DIR=%%~fI"
+set "COMPOSE_FILE=%ROOT_DIR%\docker-compose.gpu.yml"
 set "DEEP_CLEAN=0"
 set "PURGE_PROJECT_IMAGE=0"
 set "DOCKER_DESKTOP_EXE=%ProgramFiles%\Docker\Docker\Docker Desktop.exe"
@@ -16,7 +17,7 @@ call :ensure_docker_engine
 if errorlevel 1 exit /b 1
 
 echo [1/4] Stopping GPU services and removing compose containers...
-docker compose -f %COMPOSE_FILE% down --remove-orphans
+docker compose --project-directory "%ROOT_DIR%" -f "%COMPOSE_FILE%" down --remove-orphans
 if errorlevel 1 (
     echo Docker compose down failed.
     exit /b 1
@@ -73,7 +74,7 @@ if "%DEEP_CLEAN%"=="1" (
     echo [6/6] Deep cleanup complete.
 ) else (
     echo [4/4] Cleanup complete.
-    echo Tip: run docker_cleanup_gpu.bat --deep to also remove builder cache and unused volumes.
+    echo Tip: run scripts\windows\docker_cleanup_gpu.bat --deep to also remove builder cache and unused volumes.
 )
 
 endlocal

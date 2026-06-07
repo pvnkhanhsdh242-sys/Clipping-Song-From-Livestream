@@ -74,7 +74,7 @@ def resolve_default_singing_model(project_root: Path | None = None) -> tuple[Pat
     """Return the default singing model path and mode when a trained artifact exists."""
     root = project_root or Path.cwd()
     candidate = (root / DEFAULT_SINGING_MODEL_DIR).expanduser().resolve()
-    if (candidate / "model.joblib").exists():
+    if (candidate / "model.joblib").exists() or (candidate / "model.pt").exists():
         return candidate, "score"
     return None, "off"
 

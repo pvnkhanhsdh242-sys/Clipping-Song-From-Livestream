@@ -1,9 +1,9 @@
 @echo off
 setlocal
 
-set "ROOT_DIR=%~dp0"
-set "APP_PATH=%ROOT_DIR%app\ui\streamlit_app.py"
-set "PYTHON_EXE=%ROOT_DIR%.venv\Scripts\python.exe"
+for %%I in ("%~dp0..\..") do set "ROOT_DIR=%%~fI"
+set "APP_PATH=%ROOT_DIR%\app\ui\streamlit_app.py"
+set "PYTHON_EXE=%ROOT_DIR%\.venv\Scripts\python.exe"
 set "APP_URL=http://localhost:8501"
 set "ALREADY_RUNNING=0"
 

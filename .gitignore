@@ -11,6 +11,7 @@ __pycache__/
 # Test/cache
 .pytest_cache/
 .mypy_cache/
+.playwright-cli/
 
 # Build and logs
 /output/

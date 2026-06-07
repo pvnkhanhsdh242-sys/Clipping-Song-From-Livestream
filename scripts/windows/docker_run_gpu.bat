@@ -1,39 +1,25 @@
 @echo off
 setlocal
 
-set "SERVICE=karaoke-clipper-streamlit-gpu"
-set "IMAGE=karaoke-clipper:gpu"
-set "FORCE_BUILD=0"
+for %%I in ("%~dp0..\..") do set "ROOT_DIR=%%~fI"
+set "RUN_ARGS=%*"
+if "%RUN_ARGS%"=="" set "RUN_ARGS=--help"
 set "DOCKER_GPU_PLATFORM=linux/amd64"
 set "DOCKER_DESKTOP_EXE=%ProgramFiles%\Docker\Docker\Docker Desktop.exe"
 if not exist "%DOCKER_DESKTOP_EXE%" set "DOCKER_DESKTOP_EXE=%LocalAppData%\Programs\Docker\Docker\Docker Desktop.exe"
 
-if /I "%~1"=="--build" set "FORCE_BUILD=1"
-
 call :ensure_docker_engine
 if errorlevel 1 exit /b 1
 
-if "%FORCE_BUILD%"=="1" goto build
+docker run --rm -it --gpus all ^
+  --platform %DOCKER_GPU_PLATFORM% ^
+  -v "%ROOT_DIR%\output:/app/output" ^
+  -v "%ROOT_DIR%\data:/app/data" ^
+  -v "%ROOT_DIR%\secret:/app/secret" ^
+  karaoke-clipper:gpu python scripts/container_runtime.py pipeline -- %RUN_ARGS%
 
-docker image inspect "%IMAGE%" >nul 2>&1
 if errorlevel 1 (
-    echo GPU image not found. Building once before startup...
-    goto build
-)
-
-goto up
-
-:build
-docker compose -f docker-compose.gpu.yml build %SERVICE%
-if errorlevel 1 (
-    echo Docker GPU Streamlit build failed.
-    exit /b 1
-)
-
-:up
-docker compose -f docker-compose.gpu.yml up %SERVICE%
-if errorlevel 1 (
-    echo Docker GPU Streamlit startup failed.
+    echo GPU container run failed.
     exit /b 1
 )
 
@@ -46,11 +32,11 @@ if not errorlevel 1 exit /b 0
 
 echo Docker engine is not ready.
 if exist "%DOCKER_DESKTOP_EXE%" (
-    echo Starting Docker Desktop...
-    start "" "%DOCKER_DESKTOP_EXE%"
-    call :wait_for_docker 120
+  echo Starting Docker Desktop...
+  start "" "%DOCKER_DESKTOP_EXE%"
+  call :wait_for_docker 120
 ) else (
-    echo Docker Desktop executable was not found.
+  echo Docker Desktop executable was not found.
 )
 
 docker info >nul 2>&1
@@ -64,8 +50,8 @@ exit /b 1
 set "WAIT_SECONDS=%~1"
 if "%WAIT_SECONDS%"=="" set "WAIT_SECONDS=120"
 for /l %%i in (1,1,%WAIT_SECONDS%) do (
-    docker info >nul 2>&1
-    if not errorlevel 1 exit /b 0
-    timeout /t 1 >nul
+  docker info >nul 2>&1
+  if not errorlevel 1 exit /b 0
+  timeout /t 1 >nul
 )
 exit /b 1

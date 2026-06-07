@@ -8,6 +8,7 @@ import os
 from pathlib import Path
 from typing import Iterable, Optional
 
+from google.auth.exceptions import RefreshError
 from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import InstalledAppFlow
@@ -52,13 +53,29 @@ def _load_credentials(client_secrets_path: Path, token_path: Path, logger: loggi
 
     creds: Optional[Credentials] = None
     if token_path.exists():
-        creds = Credentials.from_authorized_user_file(str(token_path), SCOPES)
+        try:
+            creds = Credentials.from_authorized_user_file(str(token_path), SCOPES)
+        except ValueError as exc:
+            logger.warning("Google Drive token file is invalid; deleting %s and starting OAuth again: %s", token_path, exc)
+            token_path.unlink(missing_ok=True)
+            creds = None
 
     if not creds or not creds.valid:
         if creds and creds.expired and creds.refresh_token:
             logger.info("Refreshing Google Drive token")
-            creds.refresh(Request())
-        else:
+            try:
+                creds.refresh(Request())
+            except RefreshError as exc:
+                if not _is_invalid_grant(exc):
+                    raise
+                logger.warning(
+                    "Google Drive refresh token was rejected; deleting %s and starting OAuth again.",
+                    token_path,
+                )
+                token_path.unlink(missing_ok=True)
+                creds = None
+
+        if not creds or not creds.valid:
             logger.info("Starting Google Drive OAuth flow")
             flow = InstalledAppFlow.from_client_secrets_file(str(client_secrets_path), SCOPES)
             creds = flow.run_local_server(port=0)
@@ -66,6 +83,19 @@ def _load_credentials(client_secrets_path: Path, token_path: Path, logger: loggi
         token_path.write_text(creds.to_json(), encoding="utf-8")
 
     return creds
+
+
+def _is_invalid_grant(exc: BaseException) -> bool:
+    if "invalid_grant" in str(exc).lower():
+        return True
+    for arg in getattr(exc, "args", ()):
+        if isinstance(arg, dict) and str(arg.get("error", "")).lower() == "invalid_grant":
+            return True
+    return False
+
+
+def _escape_drive_query_literal(value: str) -> str:
+    return value.replace("\\", "\\\\").replace("'", "\\'")
 
 
 def get_drive_service(
@@ -84,21 +114,39 @@ def get_drive_service(
     return build("drive", "v3", credentials=creds)
 
 
+def find_drive_file_id(service, name: str, parent_id: Optional[str], mime_type: Optional[str] = None) -> Optional[str]:
+    safe_name = name.strip()
+    if not safe_name:
+        return None
+
+    query = f"name='{_escape_drive_query_literal(safe_name)}' and trashed=false"
+    if mime_type:
+        query += f" and mimeType='{_escape_drive_query_literal(mime_type)}'"
+    if parent_id:
+        query += f" and '{_escape_drive_query_literal(parent_id)}' in parents"
+
+    response = service.files().list(
+        q=query,
+        spaces="drive",
+        fields="files(id, name)",
+        pageSize=1,
+    ).execute()
+    files = response.get("files", [])
+    if not files:
+        return None
+    return str(files[0].get("id") or "") or None
+
+
 def ensure_drive_folder(service, name: str, parent_id: Optional[str], logger: logging.Logger) -> str:
     safe_name = name.strip() or "output"
-    escaped_name = safe_name.replace("'", "\\'")
-    query = (
-        "mimeType='application/vnd.google-apps.folder' "
-        f"and name='{escaped_name}' "
-        "and trashed=false"
+    existing_id = find_drive_file_id(
+        service,
+        safe_name,
+        parent_id,
+        mime_type="application/vnd.google-apps.folder",
     )
-    if parent_id:
-        query += f" and '{parent_id}' in parents"
-
-    response = service.files().list(q=query, spaces="drive", fields="files(id, name)").execute()
-    files = response.get("files", [])
-    if files:
-        return files[0]["id"]
+    if existing_id:
+        return existing_id
 
     metadata = {"name": safe_name, "mimeType": "application/vnd.google-apps.folder"}
     if parent_id:
@@ -110,7 +158,13 @@ def ensure_drive_folder(service, name: str, parent_id: Optional[str], logger: lo
     return folder_id
 
 
-def upload_file(service, file_path: Path, parent_id: str, logger: logging.Logger) -> None:
+def upload_file(service, file_path: Path, parent_id: str, logger: logging.Logger, skip_existing: bool = True) -> None:
+    if skip_existing:
+        existing_id = find_drive_file_id(service, file_path.name, parent_id)
+        if existing_id:
+            logger.info("Skipping existing %s (id=%s)", file_path.name, existing_id)
+            return
+
     mime_type, _ = mimetypes.guess_type(str(file_path))
     media = MediaFileUpload(str(file_path), mimetype=mime_type, resumable=True)
     metadata = {"name": file_path.name, "parents": [parent_id]}
