@@ -188,8 +188,18 @@ def _acquire_download_lock(
             time.sleep(2)
 
 
-def download_youtube_video(url: str, output_dir: Path, logger: logging.Logger, retries: int = 3) -> SourceVideo:
-    """Download a YouTube VOD with retry-safe behavior."""
+def download_youtube_video(
+    url: str,
+    output_dir: Path,
+    logger: logging.Logger,
+    retries: int = 3,
+    format_selector: Optional[str] = None,
+) -> SourceVideo:
+    """Download a YouTube VOD with retry-safe behavior.
+
+    ``format_selector`` overrides the yt-dlp ``format`` string when provided
+    (e.g. to force a player-compatible H.264 + AAC stream).
+    """
     try:
         import yt_dlp
     except ImportError as exc:
@@ -198,7 +208,7 @@ def download_youtube_video(url: str, output_dir: Path, logger: logging.Logger, r
     output_dir.mkdir(parents=True, exist_ok=True)
 
     ydl_opts = {
-        "format": "bestvideo*+bestaudio/best",
+        "format": format_selector or "bestvideo*+bestaudio/best",
         "merge_output_format": "mp4",
         "outtmpl": str(output_dir / "%(title).120s_[%(id)s].%(ext)s"),
         "noplaylist": True,

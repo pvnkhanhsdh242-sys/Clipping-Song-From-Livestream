@@ -562,6 +562,7 @@ def run_pipeline(
             include_audio_clip=config.audio_clips,
             mode=config.clip_mode,
             clip_resolution=config.clip_resolution,
+            device=config.device,
             logger=logger,
         )
 

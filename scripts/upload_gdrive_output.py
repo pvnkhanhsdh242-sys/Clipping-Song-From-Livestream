@@ -8,6 +8,8 @@ import sys
 from pathlib import Path
 from typing import Sequence
 
+from dotenv import load_dotenv
+
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
@@ -53,6 +55,7 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def main(argv: Sequence[str] | None = None) -> int:
+    load_dotenv(PROJECT_ROOT / ".env")
     args = build_parser().parse_args(argv)
     output_dir = Path(args.output_dir).expanduser().resolve()
     if not output_dir.exists():

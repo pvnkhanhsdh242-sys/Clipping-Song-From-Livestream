@@ -42,6 +42,7 @@ def _accurate_clip_command(
     end_sec: float,
     output_path: Path,
     clip_resolution: str,
+    device: str = "cpu",
 ) -> list[str]:
     command = [
         "ffmpeg",
@@ -58,19 +59,33 @@ def _accurate_clip_command(
     if vf:
         command.extend(["-vf", vf])
 
+    if device == "cuda":
+        encoder_args = [
+            "-c:v",
+            "h264_nvenc",
+            "-preset",
+            "p4",
+            "-cq",
+            "20",
+        ]
+    else:
+        encoder_args = [
+            "-c:v",
+            "libx264",
+            "-preset",
+            "veryfast",
+            "-crf",
+            "20",
+        ]
+
+    command.extend(encoder_args)
     command.extend(
         [
-        "-c:v",
-        "libx264",
-        "-preset",
-        "veryfast",
-        "-crf",
-        "20",
-        "-c:a",
-        "aac",
-        "-b:a",
-        "192k",
-        str(output_path),
+            "-c:a",
+            "aac",
+            "-b:a",
+            "192k",
+            str(output_path),
         ]
     )
 
@@ -95,6 +110,32 @@ def _fast_clip_command(video_path: Path, start_sec: float, end_sec: float, outpu
     ]
 
 
+def _run_accurate_clip_command(
+    video_path: Path,
+    start_sec: float,
+    end_sec: float,
+    clip_path: Path,
+    clip_resolution: str,
+    device: str,
+    logger: logging.Logger,
+) -> None:
+    if device == "cuda":
+        logger.info("Using NVIDIA NVENC for accurate clip export.")
+        result = run_command(
+            _accurate_clip_command(video_path, start_sec, end_sec, clip_path, clip_resolution, device="cuda"),
+            logger,
+            check=False,
+        )
+        if result.returncode == 0:
+            return
+        logger.warning("NVENC clip export failed; retrying with CPU libx264.")
+
+    run_command(
+        _accurate_clip_command(video_path, start_sec, end_sec, clip_path, clip_resolution, device="cpu"),
+        logger,
+    )
+
+
 def export_clip(
     video_path: Path,
     start_sec: float,
@@ -105,6 +146,7 @@ def export_clip(
     mode: str,
     clip_resolution: str,
     logger: logging.Logger,
+    device: str = "cpu",
 ) -> ClipExportResult:
     """Export MP4 clip and optional WAV clip for the selected interval."""
     clips_dir.mkdir(parents=True, exist_ok=True)
@@ -119,12 +161,9 @@ def export_clip(
         fast_result = run_command(_fast_clip_command(video_path, start_sec, end_sec, clip_path), logger, check=False)
         if fast_result.returncode != 0:
             logger.warning("Fast clip mode failed; retrying with accurate re-encode.")
-            run_command(
-                _accurate_clip_command(video_path, start_sec, end_sec, clip_path, clip_resolution),
-                logger,
-            )
+            _run_accurate_clip_command(video_path, start_sec, end_sec, clip_path, clip_resolution, device, logger)
     else:
-        run_command(_accurate_clip_command(video_path, start_sec, end_sec, clip_path, clip_resolution), logger)
+        _run_accurate_clip_command(video_path, start_sec, end_sec, clip_path, clip_resolution, device, logger)
 
     if audio_path:
         audio_command = [

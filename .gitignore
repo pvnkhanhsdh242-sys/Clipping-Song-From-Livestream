@@ -29,5 +29,6 @@ secret/token.json
 data/reference_library.json
 data/models/
 data/training_clips/
+yt_video_downloader/downloads/
 secret/
 .cache/

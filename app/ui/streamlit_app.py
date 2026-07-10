@@ -324,7 +324,15 @@ def _render_clip_settings(values: dict[str, object], profile_defaults: dict[str,
                 step=0.1,
             )
         with col_export:
-            values["clip_mode"] = st.selectbox("Clip mode", ["accurate", "fast"], index=0)
+            values["clip_mode"] = st.selectbox(
+                "Clip mode",
+                ["accurate", "fast"],
+                index=0,
+                help=(
+                    "Accurate mode re-encodes clips and uses NVIDIA NVENC when the runtime device is cuda. "
+                    "Fast mode with source resolution uses stream copy, so GPU usage may stay near zero."
+                ),
+            )
             values["clip_resolution"] = st.selectbox("Clip resolution", CLIP_RESOLUTION_CHOICES, index=0)
             values["audio_clips"] = st.checkbox("Export WAV clips", value=False)
             values["exclude_start_seconds"] = st.number_input("Exclude start (sec)", min_value=0.0, value=0.0, step=0.5)

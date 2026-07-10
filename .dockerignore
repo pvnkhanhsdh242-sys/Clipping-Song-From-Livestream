@@ -12,3 +12,4 @@ data/models
 data/training_clips
 .cache
 secret/token.json
+yt_video_downloader/downloads
